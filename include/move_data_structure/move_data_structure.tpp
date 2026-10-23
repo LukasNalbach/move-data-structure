@@ -86,7 +86,7 @@ uint64_t move_data_structure<enc, mode>::size_in_bytes() const
 {
     uint64_t size = sizeof(*this);
     if constexpr (enc == POS) size += input_blocks.blocks_size_in_bytes();
-    else size += data.size_in_bytes() + high_part_increments.size_in_bytes();
+    else size += D_rows.size_in_bytes() + D_high.size_in_bytes();
     if constexpr (has_inverse) size += output_blocks.blocks_size_in_bytes();
     return size;
 }
@@ -134,7 +134,7 @@ template <move_pos_encoding_t enc, move_mode_t mode>
 inline uint64_t move_data_structure<enc, mode>::p(uint64_t x) const
 {
     if constexpr (enc == POS) return input_blocks.p(x);
-    else return (high_part_increments.rank(x) << omega_offs) | low(x);
+    else return (D_high.rank(x) << omega_offs) | low(x);
 }
 
 // ############################# CONSTRUCTION METHODS #############################
@@ -144,7 +144,7 @@ template <uint8_t J>
 void move_data_structure<enc, mode>::set_row_width(uint8_t width, uint64_t num_threads) requires(mode == UNI)
 {
     if constexpr (enc == EF) {
-        data.template set_width<num_core_rows + J>(width, num_threads);
+        D_rows.template set_width<num_core_rows + J>(width, num_threads);
     } else {
         if (k_ == 0 || input_blocks.row_width(J) == width) return;
         move_input_interval_blocks old = std::move(input_blocks);
@@ -211,8 +211,8 @@ void move_data_structure<enc, mode>::serialize(std::ostream& out) const
         input_blocks.serialize_blocks(out);
         if constexpr (has_inverse) output_blocks.serialize_blocks(out);
     } else {
-        data.serialize(out);
-        high_part_increments.serialize(out);
+        D_rows.serialize(out);
+        D_high.serialize(out);
     }
 }
 
@@ -236,9 +236,9 @@ void move_data_structure<enc, mode>::load(std::istream& in, uint8_t num_extra_ro
         this->num_extra_rows = input_blocks.num_extra_rows();
         records_store_lengths = input_blocks.records_store_lengths();
     } else {
-        data.load(in);
-        omega_offs = data.template width<2>();
-        high_part_increments.load(in);
+        D_rows.load(in);
+        omega_offs = D_rows.template width<2>();
+        D_high.load(in);
     }
 }
 

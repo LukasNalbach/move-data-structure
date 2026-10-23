@@ -49,8 +49,8 @@ template <move_pos_encoding_t enc, move_mode_t mode>
 inline uint64_t move_data_structure<enc, mode>::distance(uint64_t x1, uint64_t o1, uint64_t x2, uint64_t o2) const
 {
     if constexpr (enc == EF) {
-        // add the lengths of x1, ..., x2 - 1, if the entries of data of x1, ..., x2 take at most one cache line
-        if ((x2 - x1 + 1) * data.bits_per_entry() <= 8 * cache_line_bytes) {
+        // add the lengths of x1, ..., x2 - 1, if the entries of D_rows of x1, ..., x2 take at most one cache line
+        if ((x2 - x1 + 1) * D_rows.bits_per_entry() <= 8 * cache_line_bytes) {
             const uint64_t mask = low_mask();
             uint64_t sum = o2;
             for (uint64_t x = x1; x < x2; x++) sum += (low(x + 1) - low(x)) & mask;
@@ -69,13 +69,13 @@ inline void move_data_structure<enc, mode>::move(uint64_t& i, uint64_t& x) const
     } else {
         // move the offset o = i - p(x) as in move_offset, then add p(x) of the resulting interval x
         uint64_t o = i - p(x);
-        auto [idx_x, offs_x] = data.template get_multiple<2, 1, uint64_t>(x);
+        auto [idx_x, offs_x] = D_rows.template get_multiple<2, 1, uint64_t>(x);
         o += offs_x;
         x = idx_x;
-        // prefetch the line of high_part_increments that contains bit idx(x)
-        __builtin_prefetch(high_part_increments.line(x));
+        // prefetch the line of D_high that contains bit idx(x)
+        __builtin_prefetch(D_high.line(x));
         uint64_t low_x = advance_to_interval(o, x);
-        i = ((high_part_increments.rank(x) << omega_offs) | low_x) + o;
+        i = ((D_high.rank(x) << omega_offs) | low_x) + o;
     }
 }
 
@@ -83,7 +83,7 @@ template <move_pos_encoding_t enc, move_mode_t mode>
 inline void move_data_structure<enc, mode>::move_offset(uint64_t& o, uint64_t& x) const requires(enc == EF)
 {
     // read idx(x) and offs(x) with one access
-    auto [idx_x, offs_x] = data.template get_multiple<2, 1, uint64_t>(x);
+    auto [idx_x, offs_x] = D_rows.template get_multiple<2, 1, uint64_t>(x);
     o += offs_x;
     x = idx_x;
     advance_to_interval(o, x);
