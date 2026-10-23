@@ -445,7 +445,7 @@ void move_data_structure<enc, mode>::construction::fill_blocks() requires(enc ==
 template <move_pos_encoding_t enc, move_mode_t mode>
 void move_data_structure<enc, mode>::construction::fill_ef() requires(enc == EF)
 {
-    log_phase_start(log, time, "building D_low, D_idx, D_offs and the high_part_increments");
+    log_phase_start(log, time, "building D_low, D_high, D_idx, D_offs");
 
     mds.n = n;
     mds.k_ = k_;
@@ -454,24 +454,24 @@ void move_data_structure<enc, mode>::construction::fill_ef() requires(enc == EF)
     mds.omega_idx = std::bit_width(k_);
     const uint8_t omega_low = mds.omega_offs; // width of D_low
     const uint64_t mask_low = (uint64_t { 1 } << omega_low) - 1;
-    interleaved_bit_aligned_vectors& data = mds.data;
-    data = interleaved_bit_aligned_vectors(mds.interleaved_widths(row_widths));
-    data.resize_no_init(k_ + 1, num_threads);
+    interleaved_bit_aligned_vectors& D_rows = mds.D_rows;
+    D_rows = interleaved_bit_aligned_vectors(mds.interleaved_widths(row_widths));
+    D_rows.resize_no_init(k_ + 1, num_threads);
 
     // the sentinel interval k'
-    data.template set_parallel<0, uint64_t>(k_, n & mask_low);
-    data.template set_parallel<1, uint64_t>(k_, k_);
-    data.template set_parallel<2, uint64_t>(k_, 0);
+    D_rows.template set_parallel<0, uint64_t>(k_, n & mask_low);
+    D_rows.template set_parallel<1, uint64_t>(k_, k_);
+    D_rows.template set_parallel<2, uint64_t>(k_, 0);
 
     for_constexpr<0, max_extra_rows, 1>([&](auto j) {
-        if (uint8_t(j) < row_widths.size()) data.template set_parallel<num_core_rows + j, uint64_t>(k_, uint64_t(0));
+        if (uint8_t(j) < row_widths.size()) D_rows.template set_parallel<num_core_rows + j, uint64_t>(k_, uint64_t(0));
     });
 
     Q = mds_elias_fano(); // free Q
-    cache_line_rank_bit_vector& high_part_increments = mds.high_part_increments;
+    cache_line_rank_bit_vector& D_high = mds.D_high;
     constexpr uint64_t bits_per_line = cache_line_rank_bit_vector::bits_per_line;
-    high_part_increments.allocate(k_ + 1, num_threads);
-    if (k_ % bits_per_line == 0) high_part_increments.set_line_rank(k_ / bits_per_line, n >> omega_low);
+    D_high.allocate(k_ + 1, num_threads);
+    if (k_ % bits_per_line == 0) D_high.set_line_rank(k_ / bits_per_line, n >> omega_low);
 
     if (pi_out != nullptr) {
         resize_no_init(*pi_out, k_ + 1);
@@ -483,19 +483,19 @@ void move_data_structure<enc, mode>::construction::fill_ef() requires(enc == EF)
     // sets the J-th extra row of the x_-th interval (J is a runtime value)
     auto set_extra_row = [&](uint8_t J, uint64_t x_, uint64_t value) {
         for_constexpr<0, max_extra_rows, 1>([&](auto j) {
-            if (uint8_t(j) == J) data.template set_parallel<num_core_rows + j, uint64_t>(x_, value);
+            if (uint8_t(j) == J) D_rows.template set_parallel<num_core_rows + j, uint64_t>(x_, value);
         });
     };
 
-    // pass over the input interval pieces: writes D_low, high_part_increments and the rows given in the order of p
+    // pass over the input interval pieces: writes D_low, D_high and the rows given in the order of p
     #pragma omp parallel for num_threads(num_threads) schedule(dynamic, 1)
     for (uint64_t c = 0; c < chunks; c++) {
         for_each_input_piece((c * k_) / chunks, ((c + 1) * k_) / chunks, 0, [&](uint64_t x_, uint64_t s, uint64_t len, uint64_t,
             uint64_t, uint64_t, uint64_t x, uint64_t dist) {
-            data.template set_parallel<0, uint64_t>(x_, s & mask_low);
+            D_rows.template set_parallel<0, uint64_t>(x_, s & mask_low);
             // set bit x' iff the high part grows from this piece to the next one (pieces are shorter than 2^omega_low)
-            if ((s + len) >> omega_low != s >> omega_low) high_part_increments.set_parallel(x_);
-            if (x_ % bits_per_line == 0) high_part_increments.set_line_rank(x_ / bits_per_line, s >> omega_low);
+            if ((s + len) >> omega_low != s >> omega_low) D_high.set_parallel(x_);
+            if (x_ % bits_per_line == 0) D_high.set_line_rank(x_ / bits_per_line, s >> omega_low);
 
             for (uint8_t i = 0; i < num_rows_in_p_order; i++) set_extra_row(rows_in_p_order[i], x_, pair_row_value(rows_in_p_order[i], x, dist));
         });
@@ -506,8 +506,8 @@ void move_data_structure<enc, mode>::construction::fill_ef() requires(enc == EF)
     for (uint64_t c = 0; c < chunks; c++) {
         for_each_output_piece((c * k_) / chunks, ((c + 1) * k_) / chunks, [&](uint64_t y_, uint64_t x_, uint64_t, uint64_t idx, uint64_t offs,
             uint64_t y, uint64_t dist) {
-            data.template set_parallel<1, uint64_t>(x_, idx);
-            data.template set_parallel<2, uint64_t>(x_, offs);
+            D_rows.template set_parallel<1, uint64_t>(x_, idx);
+            D_rows.template set_parallel<2, uint64_t>(x_, offs);
             if (row_in_q_order != max_extra_rows) set_extra_row(row_in_q_order, x_, pair_row_value(row_in_q_order, y, dist));
             if (pi_out != nullptr) (*pi_out)[y_] = x_;
         });

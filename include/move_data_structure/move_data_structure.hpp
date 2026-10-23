@@ -56,8 +56,8 @@ enum move_pos_encoding_t : uint8_t {
     // p(x) in O(1) time
     POS = 0,
     // stores D_low[x] = p(x) mod 2^omega_offs in omega_offs bits per input interval and the high parts
-    // p(x) >> omega_offs as one bit per interval in high_part_increments; p(x) in O(1) time; besides move on
-    // positions, it supports move_offset on (interval, offset)-pairs, which does not read high_part_increments;
+    // p(x) >> omega_offs as one bit per interval in D_high; p(x) in O(1) time; besides move on
+    // positions, it supports move_offset on (interval, offset)-pairs, which does not read D_high;
     // only for the mode UNI
     EF = 1
 };
@@ -185,8 +185,8 @@ struct mds_params {
  *
  * Storage of the fields by encoding (see move_pos_encoding_t):
  * - POS: input_blocks (and output_blocks), blocks of one cache line (see move_input_interval_blocks)
- * - EF: data (D_low[x] = p(x) mod 2^omega_offs, idx(x), offs(x), extra rows) and high_part_increments (the
- *   high parts p(x) >> omega_offs); p(x) = (high_part_increments.rank(x) << omega_offs) | D_low[x]
+ * - EF: D_rows (D_low[x] = p(x) mod 2^omega_offs, idx(x), offs(x), extra rows) and D_high (the increments of the
+ *   high parts p(x) >> omega_offs); p(x) = (D_high.rank(x) << omega_offs) | D_low[x]
  * @tparam enc encoding of the interval starting positions
  * @tparam mode direction(s) of the move queries (UNI or BI)
  */
@@ -201,7 +201,7 @@ public:
     static constexpr move_pos_encoding_t encoding = enc;
     static constexpr move_mode_t query_mode = mode;
 
-    static constexpr uint8_t num_rows = 8; // maximum number of fields of an interval in data (core fields and extra rows)
+    static constexpr uint8_t num_rows = 8; // maximum number of fields of an interval in D_rows (core fields and extra rows)
     static constexpr uint8_t num_core_rows = 3; // number of core fields (D_low[x], idx(x), offs(x))
     static constexpr uint8_t max_extra_rows = num_rows - num_core_rows; // maximum number of extra rows
     using row_widths_t = std::vector<uint8_t>; // widths (in bits) of the extra rows; its size is their number
@@ -240,11 +240,11 @@ protected:
     /* (EF) the fields of the intervals: [0..k'] entry x stores in field 0 D_low[x] = p(x) mod 2^omega_offs, in
        field 1 idx(x), in field 2 offs(x) and in field 3 + J the J-th extra row (widths: see interleaved_widths);
        entry k' is the sentinel interval with D_low n mod 2^omega_offs, idx k', offs 0 and the extra rows 0 */
-    interleaved_bit_aligned_vectors data;
+    interleaved_bit_aligned_vectors D_rows;
     /* (EF) the increments of the high parts p(x) >> omega_offs: [0..k'] bit x is set <=> p(x+1) >> omega_offs =
        (p(x) >> omega_offs) + 1 (it grows by at most 1, since len(x) < 2^omega_offs); bit k' is 0; the rank of
        line l is p(448 l) >> omega_offs, so rank(x) = p(x) >> omega_offs */
-    cache_line_rank_bit_vector high_part_increments;
+    cache_line_rank_bit_vector D_high;
 
     // (POS) the blocks of the input intervals
     move_input_interval_blocks input_blocks;
@@ -254,14 +254,14 @@ protected:
     // ############################# INTERNAL METHODS #############################
 
     /**
-     * @brief returns the widths of the fields of data (EF): D_low[x], idx(x), offs(x), extra rows
+     * @brief returns the widths of the fields of D_rows (EF): D_low[x], idx(x), offs(x), extra rows
      * @param row_widths widths (in bits) of the extra rows
      * @return the widths (in bits)
      */
     std::array<uint8_t, num_rows> interleaved_widths(const row_widths_t& row_widths) const;
 
     // returns D_low[x] = p(x) mod 2^omega_offs
-    inline uint64_t low(uint64_t x) const requires(enc == EF) { return data.template get<0, uint64_t>(x); }
+    inline uint64_t low(uint64_t x) const requires(enc == EF) { return D_rows.template get<0, uint64_t>(x); }
 
     // returns the mask of the omega_offs lowest bits
     inline uint64_t low_mask() const requires(enc == EF) { return (uint64_t { 1 } << omega_offs) - 1; }
@@ -377,7 +377,7 @@ public:
     inline uint8_t row_width() const
     {
         if constexpr (enc == POS) return input_blocks.row_width(J);
-        else return data.template width<num_core_rows + J>();
+        else return D_rows.template width<num_core_rows + J>();
     }
 
     /**
@@ -423,7 +423,7 @@ public:
     inline uint64_t row(uint64_t x) const
     {
         if constexpr (enc == POS) return input_blocks.row(x, J);
-        else return data.template get<num_core_rows + J, uint64_t>(x);
+        else return D_rows.template get<num_core_rows + J, uint64_t>(x);
     }
 
     /**
@@ -459,14 +459,14 @@ public:
     inline uint64_t idx(uint64_t x) const
     {
         if constexpr (enc == POS) return input_blocks.idx(x);
-        else return data.template get<1, uint64_t>(x);
+        else return D_rows.template get<1, uint64_t>(x);
     }
 
     // returns offs(x) = q(x) - p(idx(x))
     inline uint64_t offs(uint64_t x) const
     {
         if constexpr (enc == POS) return input_blocks.offs(x);
-        else return data.template get<2, uint64_t>(x);
+        else return D_rows.template get<2, uint64_t>(x);
     }
 
     // returns the position p(x) + o of the (interval, offset)-pair (x, o)
@@ -507,7 +507,7 @@ public:
 
     /**
      * @brief returns (p(x2) + o2) - (p(x1) + o1) for two (interval, offset)-pairs; in EF, the lengths of the
-     *        intervals x1, ..., x2 - 1 are added instead of reading high_part_increments, if the entries of data
+     *        intervals x1, ..., x2 - 1 are added instead of reading D_high, if the entries of D_rows
      *        of x1, ..., x2 take at most one cache line
      * @param x1 first input interval index
      * @param o1 offset within the x1-th input interval
@@ -552,8 +552,7 @@ public:
 
     /**
      * @brief move query on (interval, offset)-pairs (EF only): changes (o, x), o < len(x), to (o', x') with
-     *        p(x') + o' = f_I(p(x) + o) and o' < len(x'); reads only D_low, D_idx and D_offs, not
-     *        high_part_increments
+     *        p(x') + o' = f_I(p(x) + o) and o' < len(x'); reads only D_low, D_idx and D_offs, not D_high
      * @param o [0..len(x)-1] offset within the x-th input interval
      * @param x [0..k'-1] input interval index
      */
@@ -628,7 +627,7 @@ public:
     inline void set_row(uint64_t x, uint64_t v)
     {
         if constexpr (enc == POS) input_blocks.set_row(x, J, v);
-        else data.template set_parallel<num_core_rows + J, uint64_t>(x, v);
+        else D_rows.template set_parallel<num_core_rows + J, uint64_t>(x, v);
     }
 
     /**

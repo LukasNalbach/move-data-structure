@@ -723,7 +723,7 @@ public:
     void fill_blocks() requires(enc == POS);
 
     /**
-     * @brief builds data and high_part_increments of a move data structure in the encoding EF
+     * @brief builds D_low, D_high, D_idx, D_offs and the extra rows of a move data structure in the encoding EF
      */
     void fill_ef() requires(enc == EF);
 
