@@ -84,7 +84,7 @@ void move_data_structure<enc, mode>::compute_layout(uint64_t l_max, const std::a
 template <move_pos_encoding_t enc, move_mode_t mode>
 uint64_t move_data_structure<enc, mode>::size_in_bytes() const
 {
-    uint64_t size = sizeof(*this);
+    uint64_t size = 0;
     if constexpr (enc == POS) size += input_blocks.blocks_size_in_bytes();
     else size += D_rows.size_in_bytes() + D_high.size_in_bytes();
     if constexpr (has_inverse) size += output_blocks.blocks_size_in_bytes();
