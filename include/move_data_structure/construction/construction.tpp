@@ -81,7 +81,7 @@ move_data_structure<enc, mode>::construction::construction(
     if (log) {
         time = now();
         time_start = time;
-        std::cout << std::endl;
+        log_out() << std::endl;
     }
 
     // every thread gets at least one cache line of the pairs
@@ -89,7 +89,7 @@ move_data_structure<enc, mode>::construction::construction(
 
     if (num_threads > max_threads) {
         num_threads = max_threads;
-        if (log) std::cout << "warning: fewer than one cache line of pairs per thread, setting p to " << num_threads << std::endl;
+        if (log) log_out() << "warning: fewer than one cache line of pairs per thread, setting p to " << num_threads << std::endl;
     }
 
     omp_set_num_threads(num_threads);

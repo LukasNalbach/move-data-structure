@@ -222,7 +222,7 @@ void move_data_structure<enc, mode>::construction::balance()
 
     if (mf != nullptr) *mf << " rounds=" << num_rounds << " cuts=" << splits.size() << " cuts_first_round=" << num_splits_first;
     write_steps();
-    if (log) std::cout << " (" << num_rounds << (num_rounds == 1 ? " round)" : " rounds)") << std::flush;
+    if (log) log_out() << " (" << num_rounds << (num_rounds == 1 ? " round)" : " rounds)") << std::flush;
     log_phase_end(log, time, mf, "time_balance");
 }
 

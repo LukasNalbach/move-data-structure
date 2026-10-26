@@ -60,6 +60,8 @@ void move_data_structure<enc, mode>::construction::mark_pieces()
         return num;
     };
 
+    // counts the pairs of the four passes below
+    phase_progress prog(log, 4 * k);
     step_begin();
 
     // first_p: the rank of the first piece of the pair x is the number of pieces of the pairs before x; pass 0
@@ -92,6 +94,8 @@ void move_data_structure<enc, mode>::construction::mark_pieces()
                 pieces_before[c + 1] = num;
                 chunk_max_len[c] = max_len;
             }
+
+            prog.advance(x_end - x_beg);
         }
 
         if (pass == 0) {
@@ -125,6 +129,7 @@ void move_data_structure<enc, mode>::construction::mark_pieces()
             }
 
             if (pass == 0) pieces_before[c + 1] = num;
+            prog.advance(y_end - y_beg);
         }
 
         if (pass == 0) {
@@ -136,12 +141,13 @@ void move_data_structure<enc, mode>::construction::mark_pieces()
 
     first_q.set_parallel(k_);
     first_q.build(num_threads);
+    prog.finish();
     step_end("step_first_q");
     write_steps();
 
     if (mf != nullptr) *mf << " k=" << k << " k_=" << k_;
     log_phase_end(log, time, mf, "time_mark_pieces");
-    if (log) std::cout << "k' = " << format_number(k_) << ", k'/k = " << std::round(100.0 * k_ / k) / 100.0 << std::endl;
+    if (log) log_out() << "k' = " << format_number(k_) << ", k'/k = " << format_ratio(double(k_) / double(k)) << std::endl;
 }
 
 template <move_pos_encoding_t enc, move_mode_t mode>
@@ -311,6 +317,9 @@ void move_data_structure<enc, mode>::construction::fill_blocks() requires(enc ==
         sentinel_inv = input_blocks.slot_of(k_);
     }
 
+    // counts the input interval pieces of the first pass and the output interval pieces of the second pass
+    phase_progress prog(log, 2 * k_);
+
     /* pass over the input interval pieces (each chunk is a range of whole blocks): writes the block headers, the
        starting positions and the rows given in the order of p to the blocks of the input intervals and (with an
        inverse) idx_inv and offs_inv to the blocks of the output intervals */
@@ -348,6 +357,7 @@ void move_data_structure<enc, mode>::construction::fill_blocks() requires(enc ==
         });
 
         inv_writes.flush();
+        prog.advance(x_end - std::min(x_end, b_beg * records_fwd));
 
         // the records from the sentinel interval k' on get p = n, idx = k' and offs = 0
         for (uint64_t x_ = std::max(x_end, b_beg * records_fwd); x_ < b_end * records_fwd; x_++) {
@@ -419,6 +429,7 @@ void move_data_structure<enc, mode>::construction::fill_blocks() requires(enc ==
         });
 
         fwd_writes.flush();
+        prog.advance(y_end - std::min(y_end, b_beg * records_inv));
 
         if constexpr (has_inverse) {
             // the records from the sentinel interval k' on get p_inv = n and idx_inv = k'
@@ -437,6 +448,7 @@ void move_data_structure<enc, mode>::construction::fill_blocks() requires(enc ==
     }
 
     if constexpr (has_inverse) mds.output_blocks.write_sentinel(sentinel_inv);
+    prog.finish();
     step_end("step_pass_output");
     write_steps();
     log_phase_end(log, time, mf, "time_fill_blocks");
@@ -487,6 +499,9 @@ void move_data_structure<enc, mode>::construction::fill_ef() requires(enc == EF)
         });
     };
 
+    // counts the input interval pieces of the first pass and the output interval pieces of the second pass
+    phase_progress prog(log, 2 * k_);
+
     // pass over the input interval pieces: writes D_low, D_high and the rows given in the order of p
     #pragma omp parallel for num_threads(num_threads) schedule(dynamic, 1)
     for (uint64_t c = 0; c < chunks; c++) {
@@ -499,6 +514,8 @@ void move_data_structure<enc, mode>::construction::fill_ef() requires(enc == EF)
 
             for (uint8_t i = 0; i < num_rows_in_p_order; i++) set_extra_row(rows_in_p_order[i], x_, pair_row_value(rows_in_p_order[i], x, dist));
         });
+
+        prog.advance(((c + 1) * k_) / chunks - (c * k_) / chunks);
     }
 
     // pass over the output interval pieces: writes idx, offs and the row given in the order of q
@@ -511,8 +528,11 @@ void move_data_structure<enc, mode>::construction::fill_ef() requires(enc == EF)
             if (row_in_q_order != max_extra_rows) set_extra_row(row_in_q_order, x_, pair_row_value(row_in_q_order, y, dist));
             if (pi_out != nullptr) (*pi_out)[y_] = x_;
         });
+
+        prog.advance(((c + 1) * k_) / chunks - (c * k_) / chunks);
     }
 
+    prog.finish();
     log_phase_end(log, time, mf, "time_fill_ef");
 }
 
