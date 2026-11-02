@@ -77,11 +77,13 @@ move_data_structure<enc, mode>::construction::construction(
     this->log = params.log;
     this->max_interval_length = params.max_interval_length;
     this->mf = params.mf;
+    this->name = params.name;
 
     if (log) {
         time = now();
         time_start = time;
-        log_out() << std::endl;
+        // ends the line of the caller's phase, if it is open
+        end_phase_line();
     }
 
     // every thread gets at least one cache line of the pairs
@@ -92,7 +94,7 @@ move_data_structure<enc, mode>::construction::construction(
         if (log) log_out() << "warning: fewer than one cache line of pairs per thread, setting p to " << num_threads << std::endl;
     }
 
-    omp_set_num_threads(num_threads);
+    threads_scope.emplace(num_threads);
     uint8_t omega_offs;
 
     if (max_interval_length > 0) {
@@ -134,7 +136,7 @@ move_data_structure<enc, mode>::construction::construction(
     if (delete_I) I.clear();
 
     if (log) {
-        log_message("move data structure built");
+        log_message(name + " built");
         log_runtime(time_start);
         if (mf != nullptr)
             *mf << " time_total=" << time_diff_ns(time_start, time);

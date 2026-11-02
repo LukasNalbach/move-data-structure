@@ -21,7 +21,7 @@ cmake --build build -j
 ```
 
 `cmake` downloads the submodule [string-utils](https://github.com/LukasNalbach/string-utils). The tests are written to
-`build/tests/` (`MOVE_DATA_STRUCTURE_BUILD_TESTS`, `ON` if move-data-structure is the top-level project). The general
+`build/tests/` if `MOVE_DATA_STRUCTURE_BUILD_TESTS` is switched on (`OFF` by default). The general
 options and environment variables (`MOVE_DATA_STRUCTURE_MARCH_NATIVE`, ...) are described in string-utils.
 
 ## C++ usage
@@ -151,6 +151,8 @@ int main()
 ## Tests
 
 ```shell
+cmake -B build -DMOVE_DATA_STRUCTURE_BUILD_TESTS=ON
+cmake --build build
 build/tests/test-move-data-structure
 ```
 

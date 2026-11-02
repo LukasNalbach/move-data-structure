@@ -34,7 +34,7 @@
 template <move_pos_encoding_t enc, move_mode_t mode>
 void move_data_structure<enc, mode>::construction::mark_pieces()
 {
-    log_phase_start(log, time, "building the piece marks");
+    log_phase_start(log, time, "splitting the intervals");
     uint64_t chunks = num_threads == 1 ? 1 : chunks_per_thread * num_threads;
     // pieces_before[c + 1] = number of pieces of the pairs of chunk c, then the number of pieces of the chunks before c + 1
     std::vector<uint64_t> pieces_before(chunks + 1, 0);
@@ -146,8 +146,8 @@ void move_data_structure<enc, mode>::construction::mark_pieces()
     write_steps();
 
     if (mf != nullptr) *mf << " k=" << k << " k_=" << k_;
+    log_phase_detail(log, " (k' = " + format_number(k_) + ", k'/k = " + format_ratio(double(k_) / double(k)) + ")");
     log_phase_end(log, time, mf, "time_mark_pieces");
-    if (log) log_out() << "k' = " << format_number(k_) << ", k'/k = " << format_ratio(double(k_) / double(k)) << std::endl;
 }
 
 template <move_pos_encoding_t enc, move_mode_t mode>
@@ -265,7 +265,7 @@ void move_data_structure<enc, mode>::construction::for_each_input_piece(uint64_t
 template <move_pos_encoding_t enc, move_mode_t mode>
 void move_data_structure<enc, mode>::construction::fill_blocks() requires(enc == POS)
 {
-    log_phase_start(log, time, "building the blocks");
+    log_phase_start(log, time, has_inverse ? "building input_blocks, output_blocks" : "building input_blocks");
 
     mds.n = n;
     mds.k_ = k_;
@@ -457,7 +457,7 @@ void move_data_structure<enc, mode>::construction::fill_blocks() requires(enc ==
 template <move_pos_encoding_t enc, move_mode_t mode>
 void move_data_structure<enc, mode>::construction::fill_ef() requires(enc == EF)
 {
-    log_phase_start(log, time, "building D_low, D_high, D_idx, D_offs");
+    log_phase_start(log, time, "building D_rows, D_high");
 
     mds.n = n;
     mds.k_ = k_;

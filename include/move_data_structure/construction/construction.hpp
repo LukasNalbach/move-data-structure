@@ -36,6 +36,8 @@
 #include <misc/sort.hpp>
 #include <misc/utils.hpp>
 
+#include <optional>
+
 #include <omp.h>
 
 
@@ -505,6 +507,8 @@ public:
     uint64_t k_; // k', the number of intervals in the a-balanced interval sequence B_a(I), k <= k'
     uint64_t a; // balancing parameter a >= 2 (see mds_params::a)
     uint64_t num_threads; // number of threads to use
+    // sets the number of threads of OpenMP to num_threads during the construction (see omp_threads_scope)
+    std::optional<omp_threads_scope> threads_scope;
     uint64_t chunks_per_thread; // number of chunks per thread of the loops with a dynamic schedule (see mds_params)
     bool log; // toggles log messages
     uint64_t max_interval_length; // maximum interval length of I, if I is already balanced, else 0 (see mds_params)
@@ -517,6 +521,7 @@ public:
     uint8_t row_in_q_order = max_extra_rows; // index J of the row given in the order of q; max_extra_rows <=> there is none
     mds_piece_marks* first_pieces = nullptr; // if not nullptr, first_p is moved to it (see mds_params)
     std::ostream* mf; // measurement file
+    std::string name; // the name in the last log line (see mds_params::name)
     uint64_t l_max; // maximum interval length, the pairs are split at the multiples of l_max
     uint64_t max_piece_length = 0; // maximum length of a piece
     std::chrono::steady_clock::time_point time; // time point of the start of the last construction phase
