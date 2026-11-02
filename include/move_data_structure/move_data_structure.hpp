@@ -174,6 +174,7 @@ struct mds_params {
     uint8_t header_value_width = 0;
     bool log = false; // controls whether to print log messages during the construction
     std::ostream* mf = nullptr; // measurement file to write runtime data to
+    std::string name = "move data structure"; // the name in the last log line "<name> built", e.g. "M_LF"
 };
 
 /**

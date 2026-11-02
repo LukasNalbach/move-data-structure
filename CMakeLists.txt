@@ -24,7 +24,7 @@ if(NOT TARGET string_utils)
   add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/external/string-utils" EXCLUDE_FROM_ALL)
 endif()
 
-option(MOVE_DATA_STRUCTURE_BUILD_TESTS "Build the tests" ${PROJECT_IS_TOP_LEVEL})
+option(MOVE_DATA_STRUCTURE_BUILD_TESTS "Build the tests" OFF)
 set(MOVE_DATA_STRUCTURE_MAX_SHORT_VALUE "" CACHE STRING
   "Largest value stored with 32 bits in arrays of runtime width (empty: 2^32 - 1); set a small value to test the \
 40-bit values")
