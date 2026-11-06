@@ -5,8 +5,8 @@ disjoint interval sequence of [0, n) and answers move queries in constant time.
 
 - `move_data_structure<enc, mode>` is built in parallel from the pairs of the interval sequence. A move query maps a
   position and the index of its input interval to its image and the index of the input interval containing it.
-- `enc` is `POS` (default) or `EF` (Elias-Fano coded starting positions, smaller).
-- `mode` is `UNI` (default) or `BI` (also move queries on the inverse function, only with `POS`).
+- `enc` is `CACHE_LINES` (default) or `ELIAS_FANO` (Elias-Fano coded starting positions, smaller).
+- `mode` is `UNI` (default) or `BI` (also move queries on the inverse function, only with `CACHE_LINES`).
 - Up to 5 extra rows with one value of a given bit width per input interval can be stored.
 
 ## Build
@@ -91,9 +91,11 @@ int main()
     std::vector<std::pair<uint64_t, uint64_t>> pairs =
         { { 0, 4 }, { 1, 5 }, { 2, 6 }, { 3, 7 }, { 4, 0 } };
 
-    // EF: move takes and returns positions, move_offset the offset in the
+    // ELIAS_FANO: move takes and returns positions, move_offset the offset in the
     // input interval
-    move_data_structure<EF> mds_ef(make_mds_pairs(pairs, 8), 8, { .a = 2 });
+    move_data_structure<ELIAS_FANO> mds_ef(make_mds_pairs(pairs, 8), 8,
+        { .a = 2, .input_interval_queries = true });
+    std::cout << mds_ef.input_interval_at(7) << std::endl; // 5
     uint64_t i = 7, x = 5;
     mds_ef.move(i, x);
     std::cout << i << "," << x << std::endl; // 3,3
@@ -104,7 +106,7 @@ int main()
 
     // BI: move queries on the inverse function with the index y of the output
     // interval of a position
-    move_data_structure<POS, BI> mds_bi(make_mds_pairs(pairs, 8), 8,
+    move_data_structure<CACHE_LINES, BI> mds_bi(make_mds_pairs(pairs, 8), 8,
         { .a = 2 });
     i = 3;
     uint64_t y = mds_bi.output_interval_of(i, 3);
@@ -138,7 +140,7 @@ int main()
 
     move_data_structure loaded;
     std::ifstream in("mds.bin");
-    // the number of extra rows (read from the file with POS)
+    // the number of extra rows (read from the file with CACHE_LINES)
     loaded.load(in, 0);
     in.close();
     // 2 1

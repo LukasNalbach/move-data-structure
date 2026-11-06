@@ -41,12 +41,12 @@ if(NOT MOVE_DATA_STRUCTURE_MAX_SHORT_VALUE STREQUAL "")
     MOVE_DATA_STRUCTURE_MAX_SHORT_VALUE=${MOVE_DATA_STRUCTURE_MAX_SHORT_VALUE})
 endif()
 
-# construction and serialization of the interval blocks (see
-# include/move_data_structure/move_interval_blocks/move_interval_blocks.hpp)
-add_library(move_interval_blocks STATIC src/move_interval_blocks.cpp)
-target_include_directories(move_interval_blocks PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include/")
-target_link_libraries(move_interval_blocks PRIVATE string_utils)
-target_link_libraries(move_data_structure INTERFACE move_interval_blocks)
+# construction and serialization of the cache lines (see
+# include/move_data_structure/move_cache_lines/move_cache_lines.hpp)
+add_library(move_cache_lines STATIC src/move_cache_lines.cpp)
+target_include_directories(move_cache_lines PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include/")
+target_link_libraries(move_cache_lines PRIVATE string_utils)
+target_link_libraries(move_data_structure INTERFACE move_cache_lines)
 
 if(STRING_UTILS_EXTERN_TEMPLATES)
   # library with the sorts of the construction listed in include/move_data_structure/construction/construction.hpp

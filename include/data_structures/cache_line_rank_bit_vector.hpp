@@ -27,6 +27,7 @@
 #ifndef MOVE_DATA_STRUCTURE_DATA_STRUCTURES_CACHE_LINE_RANK_BIT_VECTOR_HPP
 #define MOVE_DATA_STRUCTURE_DATA_STRUCTURES_CACHE_LINE_RANK_BIT_VECTOR_HPP
 
+#include <algorithm>
 #include <bit>
 #include <cstdint>
 #include <iostream>
@@ -34,6 +35,7 @@
 
 #include <misc/files.hpp>
 #include <misc/utils.hpp>
+#include <rlbwt/bits.hpp>
 
 /**
  * @brief bit vector with rank, stored in lines of one cache line (64 bytes) each: the first word of a line stores
@@ -61,6 +63,12 @@ public:
 
     // returns a pointer to the line containing bit i
     inline const uint64_t* line(uint64_t i) const { return words.data() + words_per_line * (i / bits_per_line); }
+
+    // returns the number of lines that contain bits
+    inline uint64_t num_lines() const { return div_ceil(num_bits, bits_per_line); }
+
+    // returns the number of set bits before line l
+    inline uint64_t line_rank(uint64_t l) const { return words[words_per_line * l]; }
 
     /**
      * @brief allocates the lines for a number of bits and sets them to zero
@@ -116,6 +124,31 @@ public:
         }
 
         return count;
+    }
+
+    // returns the position of the set bit with rank k, which lies in line l
+    inline uint64_t select_in_line(uint64_t l, uint64_t k) const
+    {
+        const uint64_t* L = words.data() + words_per_line * l;
+        uint64_t j = 0;
+        k -= L[0];
+
+        while (k >= uint64_t(std::popcount(L[1 + j]))) k -= uint64_t(std::popcount(L[1 + j++]));
+
+        return l * bits_per_line + 64 * j + rlbwt::select_in_word(L[1 + j], k);
+    }
+
+    // returns the position of the first set bit at or after bit i, or size(), if there is none
+    inline uint64_t next_one(uint64_t i) const
+    {
+        while (i < num_bits) {
+            const uint64_t r = i % bits_per_line;
+            const uint64_t word = line(i)[1 + r / 64] >> (r % 64);
+            if (word != 0) return std::min(num_bits, i + uint64_t(std::countr_zero(word)));
+            i += 64 - r % 64;
+        }
+
+        return num_bits;
     }
 
     // writes the lines to an output stream

@@ -74,6 +74,7 @@ move_data_structure<enc, mode>::construction::construction(
 
     first_pieces = params.first_pieces;
 
+    this->input_interval_queries = params.input_interval_queries;
     this->log = params.log;
     this->max_interval_length = params.max_interval_length;
     this->mf = params.mf;
@@ -105,7 +106,7 @@ move_data_structure<enc, mode>::construction::construction(
         // width of D_offs: params.omega_offs, or chosen by choose_omega_offs starting at
         // bit_width(params.max_length_factor * n / k)
         omega_offs = params.omega_offs != 0 ? params.omega_offs : std::bit_width((uint64_t) ((params.max_length_factor * n) / k));
-        if constexpr (enc == POS) if (params.omega_offs == 0) omega_offs = choose_omega_offs(omega_offs, params);
+        if constexpr (enc == CACHE_LINES) if (params.omega_offs == 0) omega_offs = choose_omega_offs(omega_offs, params);
 
         // limit the interval length to l_max = 2^omega_offs - 1, so that D_offs fits into omega_offs bits
         l_max = (uint64_t { 1 } << omega_offs) - 1;
@@ -120,7 +121,7 @@ move_data_structure<enc, mode>::construction::construction(
     if (max_interval_length == 0) balance();
     mark_pieces();
 
-    if constexpr (enc == POS) fill_blocks();
+    if constexpr (enc == CACHE_LINES) fill_lines();
     else fill_ef();
 
     // free the data of the construction
@@ -148,23 +149,23 @@ move_data_structure<enc, mode>::construction::construction(
 // ############################# MAXIMUM INTERVAL LENGTH #############################
 
 template <move_pos_encoding_t enc, move_mode_t mode>
-uint8_t move_data_structure<enc, mode>::construction::choose_omega_offs(uint8_t omega_default, const mds_params& params)
-    requires(enc == POS)
+uint8_t move_data_structure<enc, mode>::construction::choose_omega_offs(uint8_t omega_default,
+    const mds_params& params) requires(enc == CACHE_LINES)
 {
     const uint8_t max_widening = params.max_omega_offs_widening;
-    const uint64_t min_block_reduction_percent = params.min_block_reduction_percent;
+    const uint64_t min_line_reduction_percent = params.min_line_reduction_percent;
     std::array<uint8_t, max_extra_rows> extra_widths {};
     std::array<uint8_t, max_extra_rows> extra_widths_inv {};
     for (uint8_t j = 0; j < row_widths.size(); j++) extra_widths[j] = row_widths[j];
     for (uint8_t j = 0; j < row_widths_inv.size(); j++) extra_widths_inv[j] = row_widths_inv[j];
 
     struct layout_t {
-        uint64_t blocks = 0; // number of blocks of the input and of the output intervals
-        uint8_t cost_fwd = 0; // cost of reading a record of the input intervals (see move_input_interval_blocks::record_read_cost)
+        uint64_t lines = 0; // number of lines of the input and of the output intervals
+        uint8_t cost_fwd = 0; // cost of reading a record of the input intervals (see move_input_cache_lines::record_read_cost)
         uint8_t cost_inv = 0; // cost of reading a record of the output intervals (only with an inverse)
     };
 
-    // returns the layout of the blocks for num_intervals intervals of length at most l_max_ and the width omega
+    // returns the layout of the lines for num_intervals intervals of length at most l_max_ and the width omega
     // of D_offs
     auto layout_of = [&](uint8_t omega, uint64_t num_intervals, uint64_t l_max_) {
         move_data_structure probe;
@@ -174,11 +175,11 @@ uint8_t move_data_structure<enc, mode>::construction::choose_omega_offs(uint8_t 
         probe.omega_offs = omega;
         probe.num_extra_rows = uint8_t(row_widths.size());
         probe.compute_layout(l_max_, extra_widths, l_max_, omega, uint8_t(row_widths_inv.size()), extra_widths_inv);
-        layout_t lay { .blocks = probe.input_blocks.data_blocks(), .cost_fwd = probe.input_blocks.record_read_cost() };
+        layout_t lay { .lines = probe.input_lines.data_lines(), .cost_fwd = probe.input_lines.record_read_cost() };
 
         if constexpr (has_inverse) {
-            lay.blocks += probe.output_blocks.data_blocks();
-            lay.cost_inv = probe.output_blocks.record_read_cost();
+            lay.lines += probe.output_lines.data_lines();
+            lay.cost_inv = probe.output_lines.record_read_cost();
         }
 
         return lay;
@@ -228,17 +229,17 @@ uint8_t move_data_structure<enc, mode>::construction::choose_omega_offs(uint8_t 
 
     layout_t base = layout_of(omega_default, num[0], std::min(max_len, cap_of(omega_default)));
     uint8_t best = omega_default;
-    uint64_t best_blocks = base.blocks;
+    uint64_t best_lines = base.lines;
 
     for (uint8_t d = 1; d <= max_widening; d++) {
         const uint8_t omega = omega_default + d;
         layout_t lay = layout_of(omega, num[d], std::min(max_len, cap_of(omega)));
         if (lay.cost_fwd > base.cost_fwd || lay.cost_inv > base.cost_inv) continue;
 
-        // choose a larger width only if it reduces the number of blocks by more than min_block_reduction_percent %
-        if (100 * lay.blocks < (100 - min_block_reduction_percent) * best_blocks) {
+        // choose a larger width only if it reduces the number of lines by more than min_line_reduction_percent %
+        if (100 * lay.lines < (100 - min_line_reduction_percent) * best_lines) {
             best = omega;
-            best_blocks = lay.blocks;
+            best_lines = lay.lines;
         }
     }
 
