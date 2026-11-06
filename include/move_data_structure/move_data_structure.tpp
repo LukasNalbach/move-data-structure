@@ -61,15 +61,15 @@ void move_data_structure<enc, mode>::compute_layout(uint64_t l_max, const std::a
     uint8_t omega_slot_inv = has_inverse ? omega_slot_fwd : 0;
 
     for (;;) {
-        // with an inverse, the header value of a block of the input intervals is a slot of an output interval
-        input_blocks.compute_layout(n, k_, omega_p, omega_offs, omega_slot_fwd, has_inverse ? omega_slot_inv : header_value_width, l_max,
+        // with an inverse, the header value of a line of the input intervals is a slot of an output interval
+        input_lines.compute_layout(n, k_, omega_p, omega_offs, omega_slot_fwd, has_inverse ? omega_slot_inv : header_value_width, l_max,
             num_extra_rows, extra_widths, records_store_lengths);
-        uint8_t needed_fwd = std::bit_width(input_blocks.max_slot());
+        uint8_t needed_fwd = std::bit_width(input_lines.max_slot());
         uint8_t needed_inv = 0;
 
         if constexpr (has_inverse) {
-            output_blocks.compute_layout(n, k_, omega_p, omega_offs_inv, omega_slot_inv, omega_slot_fwd, l_max_inv, num_extra_rows_inv, extra_widths_inv);
-            needed_inv = std::bit_width(output_blocks.max_slot());
+            output_lines.compute_layout(n, k_, omega_p, omega_offs_inv, omega_slot_inv, omega_slot_fwd, l_max_inv, num_extra_rows_inv, extra_widths_inv);
+            needed_inv = std::bit_width(output_lines.max_slot());
         }
 
         if (needed_fwd <= omega_slot_fwd && needed_inv <= omega_slot_inv) return;
@@ -85,15 +85,15 @@ template <move_pos_encoding_t enc, move_mode_t mode>
 uint64_t move_data_structure<enc, mode>::size_in_bytes() const
 {
     uint64_t size = 0;
-    if constexpr (enc == POS) size += input_blocks.blocks_size_in_bytes();
-    else size += D_rows.size_in_bytes() + D_high.size_in_bytes();
-    if constexpr (has_inverse) size += output_blocks.blocks_size_in_bytes();
+    if constexpr (enc == CACHE_LINES) size += input_lines.lines_size_in_bytes();
+    else size += D_rows.size_in_bytes() + D_high.size_in_bytes() + D_high_select.size_in_bytes();
+    if constexpr (has_inverse) size += output_lines.lines_size_in_bytes();
     return size;
 }
 
 template <move_pos_encoding_t enc, move_mode_t mode>
-uint64_t move_data_structure<enc, mode>::blocks_size_with_rows(uint8_t bits, uint8_t header_value_width, uint64_t l_max) const
-    requires(enc == POS && mode == UNI)
+uint64_t move_data_structure<enc, mode>::lines_size_with_rows(uint8_t bits, uint8_t header_value_width, uint64_t l_max) const
+    requires(enc == CACHE_LINES && mode == UNI)
 {
     move_data_structure probe;
     probe.n = n;
@@ -103,10 +103,10 @@ uint64_t move_data_structure<enc, mode>::blocks_size_with_rows(uint8_t bits, uin
     probe.num_extra_rows = num_extra_rows + 1;
     probe.header_value_width = header_value_width;
     probe.records_store_lengths = true;
-    std::array<uint8_t, max_extra_rows> extra_widths = input_blocks.row_widths();
+    std::array<uint8_t, max_extra_rows> extra_widths = input_lines.row_widths();
     extra_widths[num_extra_rows] = bits;
     probe.compute_layout(l_max, extra_widths, 0, 0, 0, {});
-    return (probe.input_blocks.data_blocks() + 1) * move_interval_blocks::bits_per_block / 8;
+    return (probe.input_lines.data_lines() + 1) * move_cache_lines::bits_per_line / 8;
 }
 
 template <move_pos_encoding_t enc, move_mode_t mode>
@@ -133,22 +133,38 @@ void move_data_structure<enc, mode>::log_data_structures() const
 template <move_pos_encoding_t enc, move_mode_t mode>
 inline uint64_t move_data_structure<enc, mode>::p(uint64_t x) const
 {
-    if constexpr (enc == POS) return input_blocks.p(x);
+    if constexpr (enc == CACHE_LINES) return input_lines.p(x);
     else return (D_high.rank(x) << omega_offs) | low(x);
 }
 
 // ############################# CONSTRUCTION METHODS #############################
 
 template <move_pos_encoding_t enc, move_mode_t mode>
+void move_data_structure<enc, mode>::build_D_high_select() requires(enc == ELIAS_FANO)
+{
+    const uint64_t num_lines = D_high.num_lines();
+    const uint64_t num_ones = n >> omega_offs;
+    D_high_select_shift = uint8_t(std::bit_width(std::max<uint64_t>(1, num_ones / num_lines)) - 1);
+    D_high_select = interleaved_bit_aligned_vectors({ uint8_t(std::bit_width(num_lines)) });
+    D_high_select.resize_no_init((num_ones >> D_high_select_shift) + 2);
+    uint64_t l = 0;
+
+    for (uint64_t j = 0; j < D_high_select.size(); j++) {
+        while (l + 1 < num_lines && D_high.line_rank(l + 1) <= j << D_high_select_shift) l++;
+        D_high_select.template set_parallel<0, uint64_t>(j, l);
+    }
+}
+
+template <move_pos_encoding_t enc, move_mode_t mode>
 template <uint8_t J>
 void move_data_structure<enc, mode>::set_row_width(uint8_t width, uint64_t num_threads) requires(mode == UNI)
 {
-    if constexpr (enc == EF) {
+    if constexpr (enc == ELIAS_FANO) {
         D_rows.template set_width<num_core_rows + J>(width, num_threads);
     } else {
-        if (k_ == 0 || input_blocks.row_width(J) == width) return;
-        move_input_interval_blocks old = std::move(input_blocks);
-        input_blocks = move_input_interval_blocks();
+        if (k_ == 0 || input_lines.row_width(J) == width) return;
+        move_input_cache_lines old = std::move(input_lines);
+        input_lines = move_input_cache_lines();
         uint64_t l_max = 0;
 
         #pragma omp parallel for num_threads(num_threads) reduction(max : l_max)
@@ -159,8 +175,8 @@ void move_data_structure<enc, mode>::set_row_width(uint8_t width, uint64_t num_t
         compute_layout(l_max, extra_widths, 0, 0, 0, {});
         uint64_t mask = low_bits_mask(width);
 
-        // copy the blocks into the new layout, truncating the values of row J to the new width
-        input_blocks.fill(num_threads,
+        // copy the lines into the new layout, truncating the values of row J to the new width
+        input_lines.fill(num_threads,
             [&](uint64_t x) { return old.p(x); },
             [&](uint64_t x) { return old.idx(x); },
             [&](uint64_t x) { return old.offs(x); },
@@ -172,11 +188,11 @@ void move_data_structure<enc, mode>::set_row_width(uint8_t width, uint64_t num_t
 template <move_pos_encoding_t enc, move_mode_t mode>
 template <typename row_fnc_t>
 void move_data_structure<enc, mode>::add_rows(const row_widths_t& widths, row_fnc_t row_of, uint8_t header_value_width,
-    uint64_t l_max, uint64_t num_threads) requires(enc == POS && mode == UNI)
+    uint64_t l_max, uint64_t num_threads) requires(enc == CACHE_LINES && mode == UNI)
 {
     if (num_extra_rows + widths.size() > max_extra_rows) throw std::invalid_argument("a move data structure has at most " + std::to_string(max_extra_rows) + " extra rows");
-    move_input_interval_blocks old = std::move(input_blocks);
-    input_blocks = move_input_interval_blocks();
+    move_input_cache_lines old = std::move(input_lines);
+    input_lines = move_input_cache_lines();
     const uint8_t num_old = num_extra_rows;
     std::array<uint8_t, max_extra_rows> extra_widths = old.row_widths();
     for (uint8_t J = 0; J < widths.size(); J++) extra_widths[num_old + J] = widths[J];
@@ -185,8 +201,8 @@ void move_data_structure<enc, mode>::add_rows(const row_widths_t& widths, row_fn
     records_store_lengths = true;
     compute_layout(l_max, extra_widths, 0, 0, 0, {});
 
-    // copy the blocks into the new layout and append the added rows
-    input_blocks.fill(num_threads,
+    // copy the lines into the new layout and append the added rows
+    input_lines.fill(num_threads,
         [&](uint64_t x) { return old.p(x); },
         [&](uint64_t x) { return old.idx(x); },
         [&](uint64_t x) { return old.offs(x); },
@@ -207,12 +223,14 @@ void move_data_structure<enc, mode>::serialize(std::ostream& out) const
     uint16_t a_ = a;
     out.write((char*) &a_, sizeof(uint16_t));
 
-    if constexpr (enc == POS) {
-        input_blocks.serialize_blocks(out);
-        if constexpr (has_inverse) output_blocks.serialize_blocks(out);
+    if constexpr (enc == CACHE_LINES) {
+        input_lines.serialize_lines(out);
+        if constexpr (has_inverse) output_lines.serialize_lines(out);
     } else {
         D_rows.serialize(out);
         D_high.serialize(out);
+        D_high_select.serialize(out);
+        out.write((char*) &D_high_select_shift, sizeof(uint8_t));
     }
 }
 
@@ -229,16 +247,18 @@ void move_data_structure<enc, mode>::load(std::istream& in, uint8_t num_extra_ro
     omega_p = std::bit_width(uint64_t(n));
     omega_idx = std::bit_width(uint64_t(k_));
 
-    if constexpr (enc == POS) {
-        input_blocks.load_blocks(in);
-        if constexpr (has_inverse) output_blocks.load_blocks(in);
-        omega_offs = input_blocks.width_offs();
-        this->num_extra_rows = input_blocks.num_extra_rows();
-        records_store_lengths = input_blocks.records_store_lengths();
+    if constexpr (enc == CACHE_LINES) {
+        input_lines.load_lines(in);
+        if constexpr (has_inverse) output_lines.load_lines(in);
+        omega_offs = input_lines.width_offs();
+        this->num_extra_rows = input_lines.num_extra_rows();
+        records_store_lengths = input_lines.records_store_lengths();
     } else {
         D_rows.load(in);
         omega_offs = D_rows.template width<2>();
         D_high.load(in);
+        D_high_select.load(in);
+        in.read((char*) &D_high_select_shift, sizeof(uint8_t));
     }
 }
 

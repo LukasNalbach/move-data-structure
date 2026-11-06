@@ -40,7 +40,6 @@
 
 #include <omp.h>
 
-
 // a split of the pair (p_x, q_x) at offset o, i.e., of its input interval at p_x + o and of its output
 // interval at q_x + o
 struct mds_split_t {
@@ -274,7 +273,7 @@ struct mds_deferred_writes {
  * 2. balance(): splits the a-heavy intervals in rounds; the first round checks all pieces, each further round
  *    the pieces containing a starting position that was added in the previous round
  * 3. mark_pieces(): computes k' and marks the first piece of each pair
- * 4. fill_blocks() (POS) / fill_ef() (EF): writes the pieces to the move data structure
+ * 4. fill_lines() (CACHE_LINES) / fill_ef() (ELIAS_FANO): writes the pieces to the move data structure
  */
 template <move_pos_encoding_t enc, move_mode_t mode>
 class move_data_structure<enc, mode>::construction {
@@ -513,6 +512,7 @@ public:
     bool log; // toggles log messages
     uint64_t max_interval_length; // maximum interval length of I, if I is already balanced, else 0 (see mds_params)
     bool delete_I; // true <=> I is sorted in place and freed (see mds_params)
+    bool input_interval_queries; // true <=> D_high_select is built (see mds_params)
     const uint8_t* q_order_keys; // [0..k-1] counting sort keys of the pairs, or nullptr (see mds_params)
     // [0..max_extra_rows-1] the extra rows filled by the construction (see mds_pair_row); values = nullptr for the other rows
     std::array<mds_pair_row, max_extra_rows> pair_rows {};
@@ -657,13 +657,13 @@ public:
     /**
      * @brief chooses the width of D_offs (the maximum interval length is l_max = 2^omega_offs - 1): the default
      *        width, or a width of up to params.max_omega_offs_widening bits more, if that reduces the number of
-     *        blocks by more than params.min_block_reduction_percent % and does not increase the cost of reading a
-     *        record (see move_input_interval_blocks::record_read_cost)
+     *        lines by more than params.min_line_reduction_percent % and does not increase the cost of reading a
+     *        record (see move_input_cache_lines::record_read_cost)
      * @param omega_default the default width, the bit width of params.max_length_factor * n / k
      * @param params the construction parameters
      * @return the chosen width
      */
-    uint8_t choose_omega_offs(uint8_t omega_default, const mds_params& params) requires(enc == POS);
+    uint8_t choose_omega_offs(uint8_t omega_default, const mds_params& params) requires(enc == CACHE_LINES);
 
     /**
      * @brief sorts the pairs by q (in place, if delete_I is set) and builds P, Q and (if has_inverse) rho
@@ -723,14 +723,14 @@ public:
     void mark_pieces();
 
     /**
-     * @brief builds the blocks of a positional move data structure
+     * @brief builds the lines of a positional move data structure
      */
-    void fill_blocks() requires(enc == POS);
+    void fill_lines() requires(enc == CACHE_LINES);
 
     /**
-     * @brief builds D_low, D_high, D_idx, D_offs and the extra rows of a move data structure in the encoding EF
+     * @brief builds D_low, D_high, D_idx, D_offs and the extra rows of a move data structure in the encoding ELIAS_FANO
      */
-    void fill_ef() requires(enc == EF);
+    void fill_ef() requires(enc == ELIAS_FANO);
 
     /**
      * @brief iterates over the output interval pieces with the ranks [y_beg, y_end) and calls f for each of them

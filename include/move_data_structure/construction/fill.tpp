@@ -263,9 +263,9 @@ void move_data_structure<enc, mode>::construction::for_each_input_piece(uint64_t
 }
 
 template <move_pos_encoding_t enc, move_mode_t mode>
-void move_data_structure<enc, mode>::construction::fill_blocks() requires(enc == POS)
+void move_data_structure<enc, mode>::construction::fill_lines() requires(enc == CACHE_LINES)
 {
-    log_phase_start(log, time, has_inverse ? "building input_blocks, output_blocks" : "building input_blocks");
+    log_phase_start(log, time, has_inverse ? "building input_lines, output_lines" : "building input_lines");
 
     mds.n = n;
     mds.k_ = k_;
@@ -279,9 +279,9 @@ void move_data_structure<enc, mode>::construction::fill_blocks() requires(enc ==
 
     // max_piece_length is the maximum length of the input and of the output intervals
     mds.compute_layout(max_piece_length, extra_widths, max_piece_length, mds.omega_offs, uint8_t(row_widths_inv.size()), extra_widths_inv);
-    uint64_t records_fwd = mds.input_blocks.intervals_per_block();
-    uint64_t blocks_fwd = mds.input_blocks.data_blocks();
-    uint64_t chunks = std::min<uint64_t>(blocks_fwd, num_threads == 1 ? 1 : chunks_per_thread * num_threads);
+    uint64_t records_fwd = mds.input_lines.intervals_per_line();
+    uint64_t lines_fwd = mds.input_lines.data_lines();
+    uint64_t chunks = std::min<uint64_t>(lines_fwd, num_threads == 1 ? 1 : chunks_per_thread * num_threads);
 
     // y_start[c] = rank of the output interval containing the starting position of the first input interval
     // piece of the chunk c (computed before Q is freed)
@@ -290,17 +290,17 @@ void move_data_structure<enc, mode>::construction::fill_blocks() requires(enc ==
     if constexpr (has_inverse) {
         #pragma omp parallel for num_threads(num_threads)
         for (uint64_t c = 0; c < chunks; c++) {
-            uint64_t x_ = ((c * blocks_fwd) / chunks) * records_fwd;
+            uint64_t x_ = ((c * lines_fwd) / chunks) * records_fwd;
             if (x_ < k_) y_start[c] = output_containing(start_of_input_piece(x_));
         }
     }
 
     Q = mds_elias_fano();
 
-    move_input_interval_blocks& input_blocks = mds.input_blocks;
+    move_input_cache_lines& input_lines = mds.input_lines;
     step_begin();
-    input_blocks.allocate(num_threads);
-    if constexpr (has_inverse) mds.output_blocks.allocate(num_threads);
+    input_lines.allocate(num_threads);
+    if constexpr (has_inverse) mds.output_lines.allocate(num_threads);
     step_end("step_allocate");
 
     if (pi_out != nullptr) {
@@ -308,35 +308,35 @@ void move_data_structure<enc, mode>::construction::fill_blocks() requires(enc ==
         (*pi_out)[k_] = k_;
     }
 
-    // header values of the sentinel blocks of the input and of the output intervals
+    // header values of the sentinel lines of the input and of the output intervals
     uint64_t sentinel_fwd = 0;
     uint64_t sentinel_inv = 0;
 
     if constexpr (has_inverse) {
-        sentinel_fwd = mds.output_blocks.slot_of(k_);
-        sentinel_inv = input_blocks.slot_of(k_);
+        sentinel_fwd = mds.output_lines.slot_of(k_);
+        sentinel_inv = input_lines.slot_of(k_);
     }
 
     // counts the input interval pieces of the first pass and the output interval pieces of the second pass
     phase_progress prog(log, 2 * k_);
 
-    /* pass over the input interval pieces (each chunk is a range of whole blocks): writes the block headers, the
-       starting positions and the rows given in the order of p to the blocks of the input intervals and (with an
-       inverse) idx_inv and offs_inv to the blocks of the output intervals */
+    /* pass over the input interval pieces (each chunk is a range of whole lines): writes the line headers, the
+       starting positions and the rows given in the order of p to the lines of the input intervals and (with an
+       inverse) idx_inv and offs_inv to the lines of the output intervals */
     step_begin();
 
     #pragma omp parallel for num_threads(num_threads) schedule(dynamic, 1)
     for (uint64_t c = 0; c < chunks; c++) {
-        uint64_t b_beg = (c * blocks_fwd) / chunks;
-        uint64_t b_end = ((c + 1) * blocks_fwd) / chunks;
+        uint64_t b_beg = (c * lines_fwd) / chunks;
+        uint64_t b_end = ((c + 1) * lines_fwd) / chunks;
         uint64_t x_end = std::min(b_end * records_fwd, k_);
         uint64_t start = 0;
 
         // the atomic write functions are only used with more than one thread
         mds_deferred_writes inv_writes { [&](uint64_t y_, uint64_t e, uint64_t offs, uint64_t) {
             if constexpr (has_inverse) {
-                if (num_threads == 1) mds.output_blocks.write_idx_offs(y_, e, offs);
-                else mds.output_blocks.write_idx_offs_parallel(y_, e, offs);
+                if (num_threads == 1) mds.output_lines.write_idx_offs(y_, e, offs);
+                else mds.output_lines.write_idx_offs_parallel(y_, e, offs);
             }
         } };
 
@@ -347,13 +347,13 @@ void move_data_structure<enc, mode>::construction::fill_blocks() requires(enc ==
             if (x_ == b * records_fwd) {
                 start = s;
                 uint64_t header_value = 0;
-                if constexpr (has_inverse) header_value = mds.output_blocks.slot_of(e);
-                input_blocks.write_header(b, s, header_value);
+                if constexpr (has_inverse) header_value = mds.output_lines.slot_of(e);
+                input_lines.write_header(b, s, header_value);
             }
 
-            input_blocks.write_rel_p(x_, s - start);
-            for (uint8_t i = 0; i < num_rows_in_p_order; i++) input_blocks.write_row(x_, rows_in_p_order[i], pair_row_value(rows_in_p_order[i], x, d));
-            if constexpr (has_inverse) inv_writes.push(mds.output_blocks.idx_word(y_), y_, e, offs);
+            input_lines.write_rel_p(x_, s - start);
+            for (uint8_t i = 0; i < num_rows_in_p_order; i++) input_lines.write_row(x_, rows_in_p_order[i], pair_row_value(rows_in_p_order[i], x, d));
+            if constexpr (has_inverse) inv_writes.push(mds.output_lines.idx_word(y_), y_, e, offs);
         });
 
         inv_writes.flush();
@@ -365,55 +365,55 @@ void move_data_structure<enc, mode>::construction::fill_blocks() requires(enc ==
 
             if (x_ == b * records_fwd) {
                 start = n;
-                input_blocks.write_header(b, n, sentinel_fwd);
+                input_lines.write_header(b, n, sentinel_fwd);
             }
 
-            input_blocks.write_rel_p(x_, n - start);
-            input_blocks.write_idx_offs_parallel(x_, k_, 0);
+            input_lines.write_rel_p(x_, n - start);
+            input_lines.write_idx_offs_parallel(x_, k_, 0);
         }
     }
 
-    input_blocks.write_sentinel(sentinel_fwd);
+    input_lines.write_sentinel(sentinel_fwd);
     step_end("step_pass_input");
     step_begin();
 
-    /* pass over the output interval pieces: writes idx, offs and the row given in the order of q to the blocks of
-       the input intervals and (with an inverse) the block headers and the starting positions to the blocks of the
+    /* pass over the output interval pieces: writes idx, offs and the row given in the order of q to the lines of
+       the input intervals and (with an inverse) the line headers and the starting positions to the lines of the
        output intervals; without an inverse, each chunk is a range of output interval pieces */
     uint64_t records_inv = 1;
-    uint64_t blocks_inv = 0;
+    uint64_t lines_inv = 0;
 
     if constexpr (has_inverse) {
-        records_inv = mds.output_blocks.intervals_per_block();
-        blocks_inv = mds.output_blocks.data_blocks();
+        records_inv = mds.output_lines.intervals_per_line();
+        lines_inv = mds.output_lines.data_lines();
     } else {
-        blocks_inv = k_;
+        lines_inv = k_;
     }
 
-    chunks = std::min<uint64_t>(blocks_inv, num_threads == 1 ? 1 : chunks_per_thread * num_threads);
+    chunks = std::min<uint64_t>(lines_inv, num_threads == 1 ? 1 : chunks_per_thread * num_threads);
 
     #pragma omp parallel for num_threads(num_threads) schedule(dynamic, 1)
     for (uint64_t c = 0; c < chunks; c++) {
-        uint64_t b_beg = (c * blocks_inv) / chunks;
-        uint64_t b_end = ((c + 1) * blocks_inv) / chunks;
+        uint64_t b_beg = (c * lines_inv) / chunks;
+        uint64_t b_end = ((c + 1) * lines_inv) / chunks;
         uint64_t y_end = std::min(b_end * records_inv, k_);
         uint64_t start = 0;
         mds_deferred_writes fwd_writes { [&](uint64_t x_, uint64_t idx, uint64_t offs, uint64_t row_value) {
             if (row_in_q_order == max_extra_rows) {
-                if (num_threads == 1) input_blocks.write_idx_offs(x_, idx, offs);
-                else input_blocks.write_idx_offs_parallel(x_, idx, offs);
+                if (num_threads == 1) input_lines.write_idx_offs(x_, idx, offs);
+                else input_lines.write_idx_offs_parallel(x_, idx, offs);
             } else if (num_threads == 1) {
-                input_blocks.write_idx_offs(x_, idx, offs);
-                input_blocks.write_row(x_, row_in_q_order, row_value);
+                input_lines.write_idx_offs(x_, idx, offs);
+                input_lines.write_row(x_, row_in_q_order, row_value);
             } else {
-                input_blocks.write_idx_offs_row_parallel(x_, idx, offs, row_in_q_order, row_value);
+                input_lines.write_idx_offs_row_parallel(x_, idx, offs, row_in_q_order, row_value);
             }
         } };
 
         for_each_output_piece(b_beg * records_inv, y_end, [&](uint64_t y_, uint64_t x_, uint64_t t, uint64_t idx, uint64_t offs,
             uint64_t y, uint64_t d) {
             // the value of the row given in the order of q belongs to the pair with the y-th smallest q
-            fwd_writes.push(input_blocks.idx_word(x_), x_, idx, offs, row_in_q_order == max_extra_rows ? 0 : pair_row_value(row_in_q_order, y, d));
+            fwd_writes.push(input_lines.idx_word(x_), x_, idx, offs, row_in_q_order == max_extra_rows ? 0 : pair_row_value(row_in_q_order, y, d));
             if (pi_out != nullptr) (*pi_out)[y_] = x_;
 
             if constexpr (has_inverse) {
@@ -421,10 +421,10 @@ void move_data_structure<enc, mode>::construction::fill_blocks() requires(enc ==
 
                 if (y_ == b * records_inv) {
                     start = t;
-                    mds.output_blocks.write_header(b, t, input_blocks.slot_of(idx));
+                    mds.output_lines.write_header(b, t, input_lines.slot_of(idx));
                 }
 
-                mds.output_blocks.write_rel_p(y_, t - start);
+                mds.output_lines.write_rel_p(y_, t - start);
             }
         });
 
@@ -438,24 +438,24 @@ void move_data_structure<enc, mode>::construction::fill_blocks() requires(enc ==
 
                 if (y_ == b * records_inv) {
                     start = n;
-                    mds.output_blocks.write_header(b, n, sentinel_inv);
+                    mds.output_lines.write_header(b, n, sentinel_inv);
                 }
 
-                mds.output_blocks.write_rel_p(y_, n - start);
-                mds.output_blocks.write_idx_offs_parallel(y_, k_, 0);
+                mds.output_lines.write_rel_p(y_, n - start);
+                mds.output_lines.write_idx_offs_parallel(y_, k_, 0);
             }
         }
     }
 
-    if constexpr (has_inverse) mds.output_blocks.write_sentinel(sentinel_inv);
+    if constexpr (has_inverse) mds.output_lines.write_sentinel(sentinel_inv);
     prog.finish();
     step_end("step_pass_output");
     write_steps();
-    log_phase_end(log, time, mf, "time_fill_blocks");
+    log_phase_end(log, time, mf, "time_fill_lines");
 }
 
 template <move_pos_encoding_t enc, move_mode_t mode>
-void move_data_structure<enc, mode>::construction::fill_ef() requires(enc == EF)
+void move_data_structure<enc, mode>::construction::fill_ef() requires(enc == ELIAS_FANO)
 {
     log_phase_start(log, time, "building D_rows, D_high");
 
@@ -532,6 +532,7 @@ void move_data_structure<enc, mode>::construction::fill_ef() requires(enc == EF)
         prog.advance(((c + 1) * k_) / chunks - (c * k_) / chunks);
     }
 
+    if (input_interval_queries) mds.build_D_high_select();
     prog.finish();
     log_phase_end(log, time, mf, "time_fill_ef");
 }

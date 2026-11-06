@@ -91,9 +91,9 @@ constexpr uint64_t bi_serialization_query_stride_with_rows = 37;
 // (x + (i * hint_factor + hint_offset) mod n) mod k'
 constexpr uint64_t hint_factor = 7919;
 constexpr uint64_t hint_offset = 13;
-// interval_near must find an input interval at most this many intervals away from the hint: it searches near_blocks
-// blocks before and after the block of the hint, and every block holds at least one interval
-constexpr uint64_t interval_near_guaranteed_distance = move_input_interval_blocks::near_blocks;
+// interval_near must find an input interval at most this many intervals away from the hint: it searches near_lines
+// lines before and after the line of the hint, and every line holds at least one interval
+constexpr uint64_t interval_near_guaranteed_distance = move_input_cache_lines::near_lines;
 
 // a disjoint interval sequence: [0..k-1] the pairs (p_i, q_i), input interval i starts at p_i (increasing) and is
 // mapped to the interval starting at q_i
@@ -130,10 +130,10 @@ static void assign_random_output_intervals(interval_sequence_t& intervals)
 
 // ############################# UNIDIRECTIONAL #############################
 
-// a random disjoint interval sequence and the move data structures built from it in the encodings POS and EF
+// a random disjoint interval sequence and the move data structures built from it in the encodings CACHE_LINES and ELIAS_FANO
 struct random_mds_instance {
-    move_data_structure<POS, UNI> mds_pos;
-    move_data_structure<EF, UNI> mds_ef;
+    move_data_structure<CACHE_LINES, UNI> mds_pos;
+    move_data_structure<ELIAS_FANO, UNI> mds_ef;
     interval_sequence_t interval_sequence; // [0..k-1] the pairs (p_i, q_i) the data structures are built from
     uint64_t input_size; // n
     uint64_t num_intervals; // k, the number of input intervals before the balancing
@@ -186,34 +186,34 @@ static random_mds_instance build_random_mds()
         double(max_balancing_parameter - min_balancing_parameter)));
     // build with a random number of threads
     uint64_t threads = std::uniform_int_distribution<uint64_t>(1, max_num_threads)(gen);
-    move_data_structure<POS, UNI> mds_pos(make_mds_pairs_random_width(interval_sequence, input_size), input_size,
+    move_data_structure<CACHE_LINES, UNI> mds_pos(make_mds_pairs_random_width(interval_sequence, input_size), input_size,
         { .num_threads = threads, .a = a });
 
-    // EF with the omega_offs of POS (only then the intervals are split equally); the pairs of each encoding are
+    // ELIAS_FANO with the omega_offs of CACHE_LINES (only then the intervals are split equally); the pairs of each encoding are
     // stored with a random width of their own
-    move_data_structure<EF, UNI> mds_ef(make_mds_pairs_random_width(interval_sequence, input_size), input_size,
+    move_data_structure<ELIAS_FANO, UNI> mds_ef(make_mds_pairs_random_width(interval_sequence, input_size), input_size,
         { .num_threads = threads, .a = a, .omega_offs = mds_pos.width_offs() });
 
     return random_mds_instance { std::move(mds_pos), std::move(mds_ef), std::move(interval_sequence), input_size,
         num_intervals, a };
 }
 
-// checks that EF stores the same intervals as POS, and that the balanced sequence has increasing p, correct D_idx and
+// checks that ELIAS_FANO stores the same intervals as CACHE_LINES, and that the balanced sequence has increasing p, correct D_idx and
 // no a-heavy output interval
 static void verify_mds_structure(random_mds_instance& r)
 {
-    move_data_structure<POS, UNI>& mds = r.mds_pos;
-    move_data_structure<EF, UNI>& mds_ef = r.mds_ef;
+    move_data_structure<CACHE_LINES, UNI>& mds = r.mds_pos;
+    move_data_structure<ELIAS_FANO, UNI>& mds_ef = r.mds_ef;
 
     #pragma omp parallel for num_threads(max_num_threads)
     for (uint64_t i = 0; i < mds.num_intervals(); i++) {
-        EXPECT_EQ(mds_ef.p(i), mds.p(i)) << "EF p mismatch (i = " << i << ")";
-        EXPECT_EQ(mds_ef.q(i), mds.q(i)) << "EF q mismatch (i = " << i << ")";
-        EXPECT_EQ(mds_ef.idx(i), mds.idx(i)) << "EF idx mismatch (i = " << i << ")";
-        EXPECT_EQ(mds_ef.offs(i), mds.offs(i)) << "EF offs mismatch (i = " << i << ")";
-        EXPECT_EQ(mds_ef.len(i), mds.len(i)) << "EF len mismatch (i = " << i << ")";
+        EXPECT_EQ(mds_ef.p(i), mds.p(i)) << "ELIAS_FANO p mismatch (i = " << i << ")";
+        EXPECT_EQ(mds_ef.q(i), mds.q(i)) << "ELIAS_FANO q mismatch (i = " << i << ")";
+        EXPECT_EQ(mds_ef.idx(i), mds.idx(i)) << "ELIAS_FANO idx mismatch (i = " << i << ")";
+        EXPECT_EQ(mds_ef.offs(i), mds.offs(i)) << "ELIAS_FANO offs mismatch (i = " << i << ")";
+        EXPECT_EQ(mds_ef.len(i), mds.len(i)) << "ELIAS_FANO len mismatch (i = " << i << ")";
     }
-    EXPECT_EQ(mds_ef.p(mds.num_intervals()), mds.p(mds.num_intervals())) << "EF p(k') mismatch";
+    EXPECT_EQ(mds_ef.p(mds.num_intervals()), mds.p(mds.num_intervals())) << "ELIAS_FANO p(k') mismatch";
 
     #pragma omp parallel for num_threads(max_num_threads)
     for (uint64_t i = 0; i < mds.num_intervals(); i++) {
@@ -236,12 +236,12 @@ static void verify_mds_structure(random_mds_instance& r)
     }
 }
 
-// checks move() of both encodings and move_offset() and distance() of EF against the interval sequence at about
+// checks move() of both encodings and move_offset() and distance() of ELIAS_FANO against the interval sequence at about
 // num_move_queries positions
 static void verify_mds_move(random_mds_instance& r)
 {
-    move_data_structure<POS, UNI>& mds = r.mds_pos;
-    move_data_structure<EF, UNI>& mds_ef = r.mds_ef;
+    move_data_structure<CACHE_LINES, UNI>& mds = r.mds_pos;
+    move_data_structure<ELIAS_FANO, UNI>& mds_ef = r.mds_ef;
     uint64_t input_size = r.input_size;
     interval_sequence_t& interval_sequence = r.interval_sequence;
 
@@ -257,7 +257,7 @@ static void verify_mds_move(random_mds_instance& r)
     for (uint64_t q = 0; q < query_positions.size(); q++) {
         const uint64_t i = query_positions[q];
 
-        // the (position, input interval) pairs of i in POS and in the interval sequence
+        // the (position, input interval) pairs of i in CACHE_LINES and in the interval sequence
         std::pair<uint64_t, uint64_t> pair_pos { i,
             bin_search_max_leq(i, 0, mds.num_intervals() - 1, [&mds](uint64_t x) { return mds.p(x); }) };
         std::pair<uint64_t, uint64_t> pair_ref { i,
@@ -268,7 +268,7 @@ static void verify_mds_move(random_mds_instance& r)
         pair_ref.first = interval_sequence[pair_ref.second].second + (pair_ref.first - interval_sequence[pair_ref.second].first);
         EXPECT_EQ(pair_pos.first, pair_ref.first);
 
-        // the EF move takes and returns positions like POS
+        // the ELIAS_FANO move takes and returns positions like CACHE_LINES
         EXPECT_EQ(mds_ef.interval_and_offset(i), std::make_pair(pair_ef.second, i - mds.p(pair_ef.second)));
         pair_ef = mds_ef.move(pair_ef);
         EXPECT_EQ(pair_ef, pair_pos);
@@ -276,7 +276,7 @@ static void verify_mds_move(random_mds_instance& r)
         // the input interval returned by move contains the moved position
         EXPECT_TRUE(mds.p(pair_pos.second) <= pair_pos.first && pair_pos.first < mds.p(pair_pos.second + 1));
 
-        // the EF move_offset takes and returns (offset, input interval) pairs
+        // the ELIAS_FANO move_offset takes and returns (offset, input interval) pairs
         auto [x, offset] = mds_ef.interval_and_offset(i);
         mds_ef.move_offset(offset, x);
         uint64_t out_pos = mds_ef.pos(x, offset);
@@ -333,8 +333,8 @@ static void verify_extra_rows(const interval_sequence_t& seq, uint64_t n, uint64
 
 static void verify_extra_rows_all_encodings(random_mds_instance& r)
 {
-    verify_extra_rows<POS>(r.interval_sequence, r.input_size, r.a);
-    verify_extra_rows<EF>(r.interval_sequence, r.input_size, r.a);
+    verify_extra_rows<CACHE_LINES>(r.interval_sequence, r.input_size, r.a);
+    verify_extra_rows<ELIAS_FANO>(r.interval_sequence, r.input_size, r.a);
 }
 
 // ############################# BIDIRECTIONAL #############################
@@ -346,7 +346,7 @@ static void verify_extra_rows_all_encodings(random_mds_instance& r)
  */
 template <move_mode_t mode>
 struct random_bidirectional_mds {
-    using mds_t = move_data_structure<POS, mode>;
+    using mds_t = move_data_structure<CACHE_LINES, mode>;
 
     interval_sequence_t intervals; // [0..k-1] the pairs (p_i, q_i)
     uint64_t num_input_intervals; // k, the number of input intervals before the balancing
@@ -366,7 +366,7 @@ struct random_bidirectional_mds {
 template <move_mode_t mode>
 static random_bidirectional_mds<mode> build_random_bidirectional_mds(uint64_t iteration)
 {
-    using mds_t = move_data_structure<POS, mode>;
+    using mds_t = move_data_structure<CACHE_LINES, mode>;
     random_bidirectional_mds<mode> r;
     const uint64_t k = std::uniform_int_distribution<uint64_t>(bi_min_num_intervals, bi_max_num_intervals)(gen);
     r.num_input_intervals = k;
@@ -596,6 +596,36 @@ static void verify_bidirectional_mds(uint64_t iteration)
     verify_bidirectional_serialization(r);
 }
 
+// checks input_interval_at at both ends of every input interval and at about num_move_queries further positions, also
+// after writing the move data structure to a stream and reading it
+static void verify_input_interval_at(const random_mds_instance& r)
+{
+    const move_data_structure<ELIAS_FANO, UNI> built(make_mds_pairs_random_width(r.interval_sequence, r.input_size),
+        r.input_size, { .a = r.a, .input_interval_queries = true });
+    std::stringstream stream;
+    built.serialize(stream);
+    move_data_structure<ELIAS_FANO, UNI> loaded;
+    loaded.load(stream, 0);
+
+    auto verify = [&](const move_data_structure<ELIAS_FANO, UNI>& mds) {
+        for (uint64_t x = 0; x < mds.num_intervals(); x++) {
+            ASSERT_EQ(mds.input_interval_at(mds.p(x)), x);
+            ASSERT_EQ(mds.input_interval_at(mds.p(x + 1) - 1), x);
+        }
+
+        const uint64_t avg_step = std::max<uint64_t>(1, r.input_size / num_move_queries);
+
+        for (uint64_t i = 0; i < r.input_size; i += 1 + gen() % (2 * avg_step)) {
+            const uint64_t x = mds.input_interval_at(i);
+            ASSERT_LE(mds.p(x), i);
+            ASSERT_LT(i, mds.p(x + 1));
+        }
+    };
+
+    verify(built);
+    verify(loaded);
+}
+
 // builds one random move data structure in each encoding and runs every check on it; the mode BI is verified on
 // interval sequences of its own
 static void verify_move_data_structure(uint64_t iteration)
@@ -604,6 +634,7 @@ static void verify_move_data_structure(uint64_t iteration)
     verify_mds_structure(r);
     verify_mds_move(r);
     verify_extra_rows_all_encodings(r);
+    verify_input_interval_at(r);
     verify_bidirectional_mds<BI>(iteration);
 }
 
@@ -613,10 +644,10 @@ TEST(test_move_data_structure, move_data_structure)
         fuzz_iterations(num_fuzz_iterations), &max_input_size, min_fuzz_input_size);
 }
 
-// max_extra_rows extra rows of 64 bits leave room for only one input interval per block
+// max_extra_rows extra rows of 64 bits leave room for only one input interval per line
 TEST(test_move_data_structure, add_rows_too_wide_throws_logic_error)
 {
-    using mds_t = move_data_structure<POS, UNI>;
+    using mds_t = move_data_structure<CACHE_LINES, UNI>;
     const uint64_t n = 2;
     mds_t mds(make_mds_pairs({ { 0, 1 }, { 1, 0 } }, n), n, { .num_threads = 1 });
     const mds_t::row_widths_t widths(mds_t::max_extra_rows, 8 * sizeof(uint64_t));
