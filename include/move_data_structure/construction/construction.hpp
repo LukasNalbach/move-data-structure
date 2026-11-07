@@ -24,6 +24,11 @@
  * SOFTWARE.
  */
 
+/**
+ * @file construction.hpp
+ * @brief the construction of a move data structure: splits, pieces and sorting
+ */
+
 #ifndef MOVE_DATA_STRUCTURE_MOVE_DATA_STRUCTURE_CONSTRUCTION_CONSTRUCTION_HPP
 #define MOVE_DATA_STRUCTURE_MOVE_DATA_STRUCTURE_CONSTRUCTION_CONSTRUCTION_HPP
 

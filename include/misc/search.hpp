@@ -24,6 +24,11 @@
  * SOFTWARE.
  */
 
+/**
+ * @file search.hpp
+ * @brief binary and exponential searches over sequences
+ */
+
 #ifndef MOVE_DATA_STRUCTURE_MISC_SEARCH_HPP
 #define MOVE_DATA_STRUCTURE_MISC_SEARCH_HPP
 

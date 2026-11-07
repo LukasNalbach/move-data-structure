@@ -24,6 +24,11 @@
  * SOFTWARE.
  */
 
+/**
+ * @file move_cache_lines.tpp
+ * @brief the methods of move_cache_lines: fields, moves and filling the lines
+ */
+
 #ifndef MOVE_DATA_STRUCTURE_MOVE_DATA_STRUCTURE_MOVE_CACHE_LINES_MOVE_CACHE_LINES_TPP
 #define MOVE_DATA_STRUCTURE_MOVE_DATA_STRUCTURE_MOVE_CACHE_LINES_MOVE_CACHE_LINES_TPP
 

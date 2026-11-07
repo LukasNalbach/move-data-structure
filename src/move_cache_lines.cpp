@@ -24,6 +24,12 @@
  * SOFTWARE.
  */
 
+/**
+ * @file move_cache_lines.cpp
+ * @brief the methods of move_cache_lines that do not depend on template parameters: layout, allocation, storing and
+ *        loading
+ */
+
 #include <cassert>
 
 #include <move_data_structure/move_cache_lines/move_cache_lines.hpp>

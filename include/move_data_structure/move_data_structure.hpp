@@ -24,6 +24,11 @@
  * SOFTWARE.
  */
 
+/**
+ * @file move_data_structure.hpp
+ * @brief the move data structure: a disjoint interval sequence with move queries
+ */
+
 #ifndef MOVE_DATA_STRUCTURE_MOVE_DATA_STRUCTURE_MOVE_DATA_STRUCTURE_HPP
 #define MOVE_DATA_STRUCTURE_MOVE_DATA_STRUCTURE_MOVE_DATA_STRUCTURE_HPP
 

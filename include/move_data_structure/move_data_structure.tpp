@@ -24,6 +24,11 @@
  * SOFTWARE.
  */
 
+/**
+ * @file move_data_structure.tpp
+ * @brief the methods of move_data_structure: building, layout, sizes, rows, storing and loading
+ */
+
 #ifndef MOVE_DATA_STRUCTURE_MOVE_DATA_STRUCTURE_MOVE_DATA_STRUCTURE_TPP
 #define MOVE_DATA_STRUCTURE_MOVE_DATA_STRUCTURE_MOVE_DATA_STRUCTURE_TPP
 

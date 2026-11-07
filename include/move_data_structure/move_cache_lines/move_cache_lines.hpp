@@ -24,6 +24,11 @@
  * SOFTWARE.
  */
 
+/**
+ * @file move_cache_lines.hpp
+ * @brief the intervals of a move data structure, stored in cache lines
+ */
+
 #ifndef MOVE_DATA_STRUCTURE_MOVE_DATA_STRUCTURE_MOVE_CACHE_LINES_MOVE_CACHE_LINES_HPP
 #define MOVE_DATA_STRUCTURE_MOVE_DATA_STRUCTURE_MOVE_CACHE_LINES_MOVE_CACHE_LINES_HPP
 

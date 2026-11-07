@@ -24,6 +24,11 @@
  * SOFTWARE.
  */
 
+/**
+ * @file split.tpp
+ * @brief the lists of splits of the construction
+ */
+
 #ifndef MOVE_DATA_STRUCTURE_MOVE_DATA_STRUCTURE_CONSTRUCTION_SPLIT_TPP
 #define MOVE_DATA_STRUCTURE_MOVE_DATA_STRUCTURE_CONSTRUCTION_SPLIT_TPP
 

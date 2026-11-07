@@ -24,6 +24,11 @@
  * SOFTWARE.
  */
 
+/**
+ * @file balance.tpp
+ * @brief balancing the disjoint interval sequence of a move data structure
+ */
+
 #ifndef MOVE_DATA_STRUCTURE_MOVE_DATA_STRUCTURE_CONSTRUCTION_BALANCE_TPP
 #define MOVE_DATA_STRUCTURE_MOVE_DATA_STRUCTURE_CONSTRUCTION_BALANCE_TPP
 

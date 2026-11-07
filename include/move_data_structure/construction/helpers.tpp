@@ -24,6 +24,11 @@
  * SOFTWARE.
  */
 
+/**
+ * @file helpers.tpp
+ * @brief the helpers of the construction: Elias-Fano coding, ranks and walks over the pairs
+ */
+
 #ifndef MOVE_DATA_STRUCTURE_MOVE_DATA_STRUCTURE_CONSTRUCTION_HELPERS_TPP
 #define MOVE_DATA_STRUCTURE_MOVE_DATA_STRUCTURE_CONSTRUCTION_HELPERS_TPP
 

@@ -24,6 +24,12 @@
  * SOFTWARE.
  */
 
+/**
+ * @file construction.tpp
+ * @brief the construction of a move data structure: the constructor, the maximum interval length and the order of the
+ *        pairs
+ */
+
 #ifndef MOVE_DATA_STRUCTURE_MOVE_DATA_STRUCTURE_CONSTRUCTION_CONSTRUCTION_TPP
 #define MOVE_DATA_STRUCTURE_MOVE_DATA_STRUCTURE_CONSTRUCTION_CONSTRUCTION_TPP
 

@@ -24,6 +24,11 @@
  * SOFTWARE.
  */
 
+/**
+ * @file cache_line_rank_bit_vector.hpp
+ * @brief bit vector with rank, stored in cache lines
+ */
+
 #ifndef MOVE_DATA_STRUCTURE_DATA_STRUCTURES_CACHE_LINE_RANK_BIT_VECTOR_HPP
 #define MOVE_DATA_STRUCTURE_DATA_STRUCTURES_CACHE_LINE_RANK_BIT_VECTOR_HPP
 

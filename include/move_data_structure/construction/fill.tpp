@@ -24,6 +24,11 @@
  * SOFTWARE.
  */
 
+/**
+ * @file fill.tpp
+ * @brief filling a move data structure with the balanced intervals
+ */
+
 #ifndef MOVE_DATA_STRUCTURE_MOVE_DATA_STRUCTURE_CONSTRUCTION_FILL_TPP
 #define MOVE_DATA_STRUCTURE_MOVE_DATA_STRUCTURE_CONSTRUCTION_FILL_TPP
 

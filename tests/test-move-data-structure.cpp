@@ -24,6 +24,11 @@
  * SOFTWARE.
  */
 
+/**
+ * @file test-move-data-structure.cpp
+ * @brief fuzz tests of move_data_structure
+ */
+
 #include <array>
 #include <cmath>
 #include <gtest/gtest.h>

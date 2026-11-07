@@ -24,6 +24,11 @@
  * SOFTWARE.
  */
 
+/**
+ * @file uint_bytes_array.hpp
+ * @brief an array of groups of unsigned values with a fixed number of bytes per value
+ */
+
 #ifndef MOVE_DATA_STRUCTURE_DATA_STRUCTURES_UINT_BYTES_ARRAY_HPP
 #define MOVE_DATA_STRUCTURE_DATA_STRUCTURES_UINT_BYTES_ARRAY_HPP
 
@@ -66,11 +71,34 @@ private:
     uint64_t _mask = 0; // the low 8 * w bits of a 64-bit word
 
     // writes the low w bytes of value to dst
-    inline void store(uint8_t* dst, uint64_t value) const;
+    inline void store(uint8_t* dst, uint64_t value) const
+    {
+        // one memcpy with a constant length per width
+        switch (_width) {
+            case 4: std::memcpy(dst, &value, 4); break;
+            case 5: std::memcpy(dst, &value, 5); break;
+            default: std::memcpy(dst, &value, 6); break;
+        }
+    }
 
     // sorts the groups by their field-th value, as records of num_fields * value_bytes bytes
     template <uint8_t field, uint8_t value_bytes>
-    void sort_records_by(uint64_t num_threads);
+    void sort_records_by(uint64_t num_threads)
+    {
+        // a group as a record of a fixed size, whose key is read with exactly value_bytes bytes
+        struct record_t {
+            uint8_t bytes[num_fields * value_bytes];
+        };
+
+        auto key = [](const record_t& record) {
+            uint64_t value = 0;
+            std::memcpy(&value, record.bytes + field * value_bytes, value_bytes);
+            return value;
+        };
+
+        record_t* records = reinterpret_cast<record_t*>(_data.data());
+        radix_sort(records, records + _size, key, num_threads);
+    }
 
 public:
     uint_bytes_array() = default;
@@ -87,10 +115,20 @@ public:
      * @param size number of groups
      * @param max_value the largest value
      */
-    void reset(uint64_t size, uint64_t max_value);
+    void reset(uint64_t size, uint64_t max_value)
+    {
+        _size = size;
+        _width = ::bytes_per_value(max_value);
+        _mask = (uint64_t { 1 } << (8 * _width)) - 1;
+        resize_no_init(_data, size * num_fields * _width + sizeof(uint64_t));
+    }
 
     // frees the array
-    void clear();
+    void clear()
+    {
+        _data = no_init_vector<uint8_t>();
+        _size = 0;
+    }
 
     // returns the number of groups
     inline uint64_t size() const { return _size; }
@@ -108,7 +146,12 @@ public:
 
     // returns the field-th value of the i-th group
     template <uint8_t field = 0>
-    inline uint64_t get(uint64_t i) const;
+    inline uint64_t get(uint64_t i) const
+    {
+        uint64_t value;
+        std::memcpy(&value, _data.data() + (i * num_fields + field) * _width, sizeof(uint64_t));
+        return value & _mask;
+    }
 
     // sets the field-th value of the i-th group (threads may write different groups at the same time)
     template <uint8_t field = 0>
@@ -116,9 +159,14 @@ public:
 
     // sorts the groups by their field-th value (see radix_sort)
     template <uint8_t field = 0>
-    void sort_by(uint64_t num_threads);
+    void sort_by(uint64_t num_threads)
+    {
+        switch (_width) {
+            case 4: sort_records_by<field, 4>(num_threads); break;
+            case 5: sort_records_by<field, 5>(num_threads); break;
+            default: sort_records_by<field, 6>(num_threads); break;
+        }
+    }
 };
-
-#include "uint_bytes_array.tpp"
 
 #endif // MOVE_DATA_STRUCTURE_DATA_STRUCTURES_UINT_BYTES_ARRAY_HPP

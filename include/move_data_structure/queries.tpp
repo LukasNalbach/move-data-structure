@@ -24,6 +24,11 @@
  * SOFTWARE.
  */
 
+/**
+ * @file queries.tpp
+ * @brief the queries of move_data_structure: move, inverse move and input intervals
+ */
+
 #ifndef MOVE_DATA_STRUCTURE_MOVE_DATA_STRUCTURE_QUERIES_TPP
 #define MOVE_DATA_STRUCTURE_MOVE_DATA_STRUCTURE_QUERIES_TPP
 

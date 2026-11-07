@@ -24,8 +24,11 @@
  * SOFTWARE.
  */
 
-// compiles the explicit instantiations of the sorts of the construction declared extern in
-// move_data_structure/construction/construction.hpp
+/**
+ * @file instantiations.cpp
+ * @brief compiles the explicit instantiations of the sorts of the construction declared extern in
+ *        move_data_structure/construction/construction.hpp
+ */
 
 #include <move_data_structure/move_data_structure.hpp>
 
