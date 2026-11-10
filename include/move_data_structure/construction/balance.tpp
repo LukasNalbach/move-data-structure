@@ -161,7 +161,7 @@ void move_data_structure<enc, mode>::construction::balance()
         if (mf != nullptr) *mf << " cuts_round_" << num_rounds << "=" << new_splits.size();
         step_end("step_sort_cuts");
         step_begin();
-        // every split offset adds an interval
+        // each split offset results in one more interval
         mds_check_num_intervals(k + splits.offsets.size() + new_splits.size());
         splits.merge(new_splits, num_threads);
         step_end("step_merge");
@@ -170,7 +170,7 @@ void move_data_structure<enc, mode>::construction::balance()
         step_end("step_index_cuts");
         step_begin();
 
-        // a split of the pair x at offset o adds the input interval starting position p_x + o and the output
+        // splitting the pair x at offset o results in the input interval starting position p_x + o and the output
         // interval starting position q_x + o; find the output interval piece containing p_x + o and (if
         // has_inverse) the input interval piece containing q_x + o
         resize_no_init(out_pieces, new_splits.size());

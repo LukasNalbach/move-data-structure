@@ -39,8 +39,8 @@
 #include <misc/sort.hpp>
 #include <misc/utils.hpp>
 
-// the largest value that an array with a width chosen at runtime stores with 32 bits (see bytes_per_value); a build
-// can set it lower to test the 40-bit values (see MOVE_DATA_STRUCTURE_MAX_SHORT_VALUE in CMakeLists.txt)
+// the largest value that is stored with 32 bits in an array with a width chosen at runtime (see bytes_per_value); it
+// can be set lower in a build to test the 40-bit values (see MOVE_DATA_STRUCTURE_MAX_SHORT_VALUE in CMakeLists.txt)
 #ifndef MOVE_DATA_STRUCTURE_MAX_SHORT_VALUE
 #define MOVE_DATA_STRUCTURE_MAX_SHORT_VALUE ((uint64_t { 1 } << 32) - 1)
 #endif
@@ -55,7 +55,7 @@ inline constexpr uint8_t bytes_per_value(uint64_t max_value)
 
 /**
  * @brief an array of groups of num_fields unsigned values (e.g., pairs for num_fields = 2), each value stored with
- *        4, 5 or 6 bytes (the fewest that hold the largest value, see bytes_per_value); a value is read by loading
+ *        4, 5 or 6 bytes (the fewest in which the largest value fits, see bytes_per_value); a value is read by loading
  *        8 bytes and masking them
  * @tparam num_fields number of values per group
  */

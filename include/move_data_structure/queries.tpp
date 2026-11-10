@@ -54,7 +54,7 @@ template <move_pos_encoding_t enc, move_mode_t mode>
 inline uint64_t move_data_structure<enc, mode>::distance(uint64_t x1, uint64_t o1, uint64_t x2, uint64_t o2) const
 {
     if constexpr (enc == ELIAS_FANO) {
-        // add the lengths of x1, ..., x2 - 1, if the entries of D_rows of x1, ..., x2 take at most one cache line
+        // add the lengths of x1, ..., x2 - 1, if the entries of D_rows of x1, ..., x2 occupy at most one cache line
         if ((x2 - x1 + 1) * D_rows.bits_per_entry() <= 8 * cache_line_bytes) {
             const uint64_t mask = low_mask();
             uint64_t sum = o2;
@@ -74,7 +74,7 @@ inline uint64_t move_data_structure<enc, mode>::input_interval_at(uint64_t i) co
     uint64_t first = 0; // the first input interval with the high part of i
 
     if (high != 0) {
-        // the last line whose rank is at most the rank of the set bit that raises the high part to the one of i
+        // the last line whose rank is at most the rank of the set bit at which the high part increases to the one of i
         const uint64_t rank = high - 1;
         const uint64_t j = rank >> D_high_select_shift;
         uint64_t l = D_high_select.template get<0, uint64_t>(j);

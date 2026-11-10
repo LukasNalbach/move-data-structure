@@ -121,7 +121,7 @@ public:
         const int64_t r = int64_t(i % bits_per_line);
         uint64_t count = L[0];
 
-        // word j contributes its bits before bit r: all of them, none, or the lowest r - 64j
+        // the bits of word j before bit r are counted: all of them, none, or the lowest r - 64j
         for (uint64_t j = 0; j + 1 < words_per_line; j++) {
             int64_t d = r - int64_t(64 * j);
             uint64_t mask = d <= 0 ? 0 : low_bits_mask(uint64_t(d));

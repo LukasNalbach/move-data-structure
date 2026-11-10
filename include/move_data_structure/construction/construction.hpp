@@ -189,8 +189,8 @@ public:
 };
 
 /**
- * @brief bit vector with rank and select that can be set and built in parallel; marks the first piece of each
- *        pair among the pieces of all pairs (see move_data_structure::construction::mark_pieces)
+ * @brief bit vector with rank and select that can be set and built in parallel, in which the first piece of each
+ *        pair among the pieces of all pairs is marked (see move_data_structure::construction::mark_pieces)
  */
 class mds_piece_marks {
 protected:
@@ -275,8 +275,8 @@ struct mds_deferred_writes {
  * of each pair in splits.
  *
  * 1. order_pairs(): sorts the pairs by q and builds P and Q
- * 2. balance(): splits the a-heavy intervals in rounds; the first round checks all pieces, each further round
- *    the pieces containing a starting position that was added in the previous round
+ * 2. balance(): splits the a-heavy intervals in rounds; in the first round, all pieces are checked, in each further
+ *    round the pieces containing a starting position that was added in the previous round
  * 3. mark_pieces(): computes k' and marks the first piece of each pair
  * 4. fill_lines() (CACHE_LINES) / fill_ef() (ELIAS_FANO): writes the pieces to the move data structure
  */
@@ -514,7 +514,7 @@ public:
     // sets the number of threads of OpenMP to num_threads during the construction (see omp_threads_scope)
     std::optional<omp_threads_scope> threads_scope;
     uint64_t chunks_per_thread; // number of chunks per thread of the loops with a dynamic schedule (see mds_params)
-    bool log; // toggles log messages
+    bool log; // whether log messages are printed
     uint64_t max_interval_length; // maximum interval length of I, if I is already balanced, else 0 (see mds_params)
     bool delete_I; // true <=> I is sorted in place and freed (see mds_params)
     bool input_interval_queries; // true <=> D_high_select is built (see mds_params)
@@ -532,7 +532,7 @@ public:
     std::chrono::steady_clock::time_point time; // time point of the start of the last construction phase
     std::chrono::steady_clock::time_point time_start; // time point of the start of the entire construction
 
-    pair_arr_t I_copy; // stores pairs_by_q, if I is not sorted in place
+    pair_arr_t I_copy; // contains pairs_by_q if I is not sorted in place
     // [0..k-1] the pairs (x, q_x), sorted by q_x: field 0 of entry y is the index x of the pair of the y-th output
     // interval, field 1 its q_x; points to I or to I_copy
     pair_arr_t* pairs_by_q = nullptr;
@@ -661,9 +661,9 @@ public:
 
     /**
      * @brief chooses the width of D_offs (the maximum interval length is l_max = 2^omega_offs - 1): the default
-     *        width, or a width of up to params.max_omega_offs_widening bits more, if that reduces the number of
-     *        lines by more than params.min_line_reduction_percent % and does not increase the cost of reading a
-     *        record (see move_input_cache_lines::record_read_cost)
+     *        width, or a width of up to params.max_omega_offs_widening bits more if, with it, the number of lines
+     *        decreases by more than params.min_line_reduction_percent % and the cost of reading a record does not
+     *        increase (see move_input_cache_lines::record_read_cost)
      * @param omega_default the default width, the bit width of params.max_length_factor * n / k
      * @param params the construction parameters
      * @return the chosen width
@@ -682,9 +682,9 @@ public:
     void index_splits();
 
     /**
-     * @brief splits a-heavy intervals until the interval sequence is a-balanced, in rounds: the first round
-     *        checks all pieces, each further round checks the pieces containing a starting position that was
-     *        added by a split of the previous round
+     * @brief splits a-heavy intervals until the interval sequence is a-balanced, in rounds: in the first round, all
+     *        pieces are checked, in each further round the pieces containing a starting position that was added by a
+     *        split of the previous round
      */
     void balance();
 

@@ -65,7 +65,7 @@ void move_data_structure<enc, mode>::construction::mark_pieces()
         return num;
     };
 
-    // counts the pairs of the four passes below
+    // the progress, counted in the pairs of the four passes below
     phase_progress prog(log, 4 * k);
     step_begin();
 
@@ -322,7 +322,8 @@ void move_data_structure<enc, mode>::construction::fill_lines() requires(enc == 
         sentinel_inv = input_lines.slot_of(k_);
     }
 
-    // counts the input interval pieces of the first pass and the output interval pieces of the second pass
+    // the progress, counted in the input interval pieces of the first pass and the output interval pieces of the
+    // second pass
     phase_progress prog(log, 2 * k_);
 
     /* pass over the input interval pieces (each chunk is a range of whole lines): writes the line headers, the
@@ -364,7 +365,7 @@ void move_data_structure<enc, mode>::construction::fill_lines() requires(enc == 
         inv_writes.flush();
         prog.advance(x_end - std::min(x_end, b_beg * records_fwd));
 
-        // the records from the sentinel interval k' on get p = n, idx = k' and offs = 0
+        // the records from the sentinel interval k' on are set to p = n, idx = k' and offs = 0
         for (uint64_t x_ = std::max(x_end, b_beg * records_fwd); x_ < b_end * records_fwd; x_++) {
             uint64_t b = x_ / records_fwd;
 
@@ -437,7 +438,7 @@ void move_data_structure<enc, mode>::construction::fill_lines() requires(enc == 
         prog.advance(y_end - std::min(y_end, b_beg * records_inv));
 
         if constexpr (has_inverse) {
-            // the records from the sentinel interval k' on get p_inv = n and idx_inv = k'
+            // the records from the sentinel interval k' on are set to p_inv = n and idx_inv = k'
             for (uint64_t y_ = std::max(y_end, b_beg * records_inv); y_ < b_end * records_inv; y_++) {
                 uint64_t b = y_ / records_inv;
 
@@ -504,7 +505,8 @@ void move_data_structure<enc, mode>::construction::fill_ef() requires(enc == ELI
         });
     };
 
-    // counts the input interval pieces of the first pass and the output interval pieces of the second pass
+    // the progress, counted in the input interval pieces of the first pass and the output interval pieces of the
+    // second pass
     phase_progress prog(log, 2 * k_);
 
     // pass over the input interval pieces: writes D_low, D_high and the rows given in the order of p

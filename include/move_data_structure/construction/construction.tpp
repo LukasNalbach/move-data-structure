@@ -93,7 +93,7 @@ move_data_structure<enc, mode>::construction::construction(
         end_phase_line();
     }
 
-    // every thread gets at least one cache line of the pairs
+    // each thread is assigned at least one cache line of the pairs
     const uint64_t max_threads = std::max<uint64_t>(1, I.size_in_bytes() / cache_line_bytes);
 
     if (num_threads > max_threads) {
@@ -193,8 +193,8 @@ uint8_t move_data_structure<enc, mode>::construction::choose_omega_offs(uint8_t 
 
     auto cap_of = [](uint8_t omega) { return (uint64_t { 1 } << omega) - 1; };
 
-    // return the default width, if even with k intervals (i.e., without any split) each larger width
-    // increases the cost of reading a record
+    // return the default width if, even with k intervals (i.e., without any split), the cost of reading a record is
+    // higher with each larger width
     layout_t lay_default = layout_of(omega_default, k, cap_of(omega_default));
     bool has_candidate = false;
 
@@ -242,7 +242,7 @@ uint8_t move_data_structure<enc, mode>::construction::choose_omega_offs(uint8_t 
         layout_t lay = layout_of(omega, num[d], std::min(max_len, cap_of(omega)));
         if (lay.cost_fwd > base.cost_fwd || lay.cost_inv > base.cost_inv) continue;
 
-        // choose a larger width only if it reduces the number of lines by more than min_line_reduction_percent %
+        // choose a larger width only if the number of lines decreases with it by more than min_line_reduction_percent %
         if (100 * lay.lines < (100 - min_line_reduction_percent) * best_lines) {
             best = omega;
             best_lines = lay.lines;

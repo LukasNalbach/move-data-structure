@@ -39,7 +39,7 @@
 void move_cache_lines::throw_field_too_wide(uint8_t width, uint64_t value, const char* name)
 {
     throw std::logic_error(std::string("cache lines: the ") + name + " " + std::to_string(value) +
-        " does not fit " + std::to_string(width) + " bits");
+        " does not fit into " + std::to_string(width) + " bits");
 }
 
 void move_cache_lines::set_layout(uint64_t n, uint64_t k_, uint8_t omega_line_start, uint64_t num_records)
@@ -117,7 +117,7 @@ void move_input_cache_lines::compute_layout(uint64_t n, uint64_t k_, uint8_t ome
     // the width of the first field of a record: the length of the interval, or p(x) relative to the line start
     auto rel_p_width = [&](uint64_t num_records) { return uint8_t(std::bit_width(store_lengths ? l_max : (num_records - 1) * l_max)); };
 
-    // returns the number of bits of a line with the given number of records (omit: record 0 omits its rel p)
+    // returns the number of bits of a line with the given number of records (omit: the rel p of record 0 is omitted)
     auto line_bits = [&](uint64_t num_records, bool omit) {
         uint64_t rel_p_bits = rel_p_width(num_records);
         uint64_t records_bits = num_records * (rel_p_bits + fixed_bits);
@@ -137,7 +137,7 @@ void move_input_cache_lines::compute_layout(uint64_t n, uint64_t k_, uint8_t ome
     if (num_records == 0) throw std::logic_error("the fields of a move data structure do not fit a cache line");
     omits_first_rel_p = false;
 
-    // let record 0 omit its rel p, if more records fit into a line then and record_read_cost() does not increase
+    // omit the rel p of record 0 if more records fit into a line then and record_read_cost() does not increase
     for (uint64_t more = max_records_per_line; !store_lengths && more > num_records; more--) {
         if (line_bits(more, true) <= bits_per_line && read_cost(more, true) <= read_cost(num_records, false)) {
             num_records = more;

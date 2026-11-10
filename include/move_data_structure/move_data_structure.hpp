@@ -56,13 +56,13 @@
  * @brief encoding of the interval starting positions p(x) of a move data structure
  */
 enum move_pos_encoding_t : uint8_t {
-    // stores p(x) in omega_p = bit_width(n) bits per input interval, in the lines of move_input_cache_lines;
-    // p(x) in O(1) time
+    // p(x) is stored in omega_p = bit_width(n) bits per input interval, in the lines of move_input_cache_lines;
+    // p(x) is computed in O(1) time
     CACHE_LINES = 0,
-    // stores D_low[x] = p(x) mod 2^omega_offs in omega_offs bits per input interval and the high parts
-    // p(x) >> omega_offs as one bit per interval in D_high; p(x) in O(1) time; besides move on
-    // positions, it supports move_offset on (interval, offset)-pairs, which does not read D_high;
-    // only for the mode UNI
+    // D_low[x] = p(x) mod 2^omega_offs is stored in omega_offs bits per input interval, the high parts
+    // p(x) >> omega_offs as one bit per interval in D_high; p(x) is computed in O(1) time. Besides move on
+    // positions, move_offset on (interval, offset)-pairs is supported, which does not read D_high. Only for the
+    // mode UNI.
     ELIAS_FANO = 1
 };
 
@@ -108,8 +108,8 @@ struct mds_pair_row {
     // true <=> values[i] belongs to the pair with the i-th smallest q, false <=> to the pair with the i-th
     // smallest p (at most one row can be given by q)
     bool in_q_order = false;
-    // true <=> an interval starting d positions after the start of its pair gets the value of the pair minus d,
-    // false <=> each interval gets the value of its pair
+    // true <=> an interval starting d positions after the start of its pair is assigned the value of the pair minus
+    // d, false <=> each interval is assigned the value of its pair
     bool subtract_offset = false;
 };
 
@@ -118,7 +118,7 @@ class mds_piece_marks;
 // default of the balancing parameter a (see mds_params::a)
 inline constexpr uint64_t default_balancing_parameter = 8;
 
-// the smallest balancing parameter a: the balancing bounds k' by k * a/(a-1) (see mds_params::a)
+// the smallest balancing parameter a; after the balancing, k' <= k * a/(a-1) (see mds_params::a)
 inline constexpr uint64_t min_balancing_parameter = 2;
 
 // the largest number of intervals k' (after the balancing) of a move data structure: its construction stores
@@ -144,22 +144,23 @@ inline void mds_check_num_intervals(uint64_t num_intervals)
 struct mds_params {
     uint64_t num_threads = omp_get_max_threads(); // number of threads to use during the construction
     // balancing parameter a >= 2: after the balancing, every output interval contains fewer than 2a starting positions
-    // of input intervals (with an inverse, also vice versa); restricts k' to at most k * a/(a-1)
+    // of input intervals (with an inverse, also vice versa), and k' <= k * a/(a-1)
     uint64_t a = default_balancing_parameter;
-    // maximum interval length of I, if I is already balanced: the balancing is skipped and D_offs gets the bit
-    // width of this value; 0 <=> I is balanced by the construction
+    // maximum interval length of I, if I is already balanced: the balancing is skipped and the width of D_offs is the
+    // bit width of this value; 0 <=> I is balanced by the construction
     uint64_t max_interval_length = 0;
     // true <=> the construction frees I (set by the constructors of move_data_structure)
     bool delete_I = false;
     // [0..k-1] one byte per pair, s.t. the stable order of the pairs by these bytes is their order by q (e.g.,
-    // the symbols of the BWT runs for LF), or nullptr; replaces the radix sort of the pairs by a counting sort
+    // the symbols of the BWT runs for LF), or nullptr; if given, the pairs are sorted by q with a counting sort instead
+    // of a radix sort
     const uint8_t* q_order_keys = nullptr;
     // [0..number of extra rows - 1] the extra rows filled by the construction (see mds_pair_row); nullptr <=> none
     const mds_pair_row* pair_rows = nullptr;
-    // if not nullptr, receives a bit vector with select marking the first input interval of each pair, i.e.,
-    // select(i) is the index of the first input interval of the pair with the i-th smallest p
+    // if not nullptr, a bit vector with select in which the first input interval of each pair is marked is moved to
+    // it, i.e., select(i) is the index of the first input interval of the pair with the i-th smallest p
     mds_piece_marks* first_pieces = nullptr;
-    // width of D_offs, limits the interval length to l_max = 2^omega_offs - 1; 0 <=> chosen by the construction
+    // width of D_offs; the interval length is limited to l_max = 2^omega_offs - 1; 0 <=> chosen by the construction
     // (see construction::choose_omega_offs)
     uint8_t omega_offs = 0;
     // with omega_offs = 0: the width of D_offs is at least bit_width(max_length_factor * n / k), i.e., l_max is at least
@@ -168,7 +169,7 @@ struct mds_params {
     // with omega_offs = 0 and the encoding CACHE_LINES: the construction tries widths of D_offs up to this many bits larger
     // than the one given by max_length_factor ...
     uint8_t max_omega_offs_widening = 3;
-    // ... and takes a larger width only if it reduces the number of lines by more than this percentage
+    // ... and chooses a larger width only if the number of lines decreases with it by more than this percentage
     uint64_t min_line_reduction_percent = 1;
     // number of chunks per thread of the parallel loops of the construction with a dynamic schedule (over pairs, pieces
     // or lines, whose work differs); more chunks balance the work better, but each chunk has a constant cost
@@ -178,7 +179,7 @@ struct mds_params {
     uint8_t header_value_width = 0;
     // true <=> (ELIAS_FANO) D_high_select is built, which input_interval_at reads
     bool input_interval_queries = false;
-    bool log = false; // controls whether to print log messages during the construction
+    bool log = false; // whether log messages are printed during the construction
     std::ostream* mf = nullptr; // measurement file to write runtime data to
     std::string name = "move data structure"; // the name in the last log line "<name> built", e.g. "M_LF"
 };
@@ -522,7 +523,7 @@ public:
     /**
      * @brief returns (p(x2) + o2) - (p(x1) + o1) for two (interval, offset)-pairs; in ELIAS_FANO, the lengths of the
      *        intervals x1, ..., x2 - 1 are added instead of reading D_high, if the entries of D_rows
-     *        of x1, ..., x2 take at most one cache line
+     *        of x1, ..., x2 occupy at most one cache line
      * @param x1 first input interval index
      * @param o1 offset within the x1-th input interval
      * @param x2 second input interval index (with p(x2) + o2 >= p(x1) + o1)
@@ -590,7 +591,7 @@ public:
 
     /**
      * @brief returns the index of the input interval containing position i (only with
-     *        mds_params::input_interval_queries); takes O(log(number of intervals with the high part of i)) time
+     *        mds_params::input_interval_queries) in O(log(number of intervals with the high part of i)) time
      * @param i [0..n-1] a position
      */
     inline uint64_t input_interval_at(uint64_t i) const requires(enc == ELIAS_FANO);
@@ -662,7 +663,7 @@ public:
     inline void set_row_inv(uint64_t y, uint64_t v) requires(has_inverse) { output_lines.set_row(y, J, v); }
 
     /**
-     * @brief changes the width of the J-th extra row, preserving the stored values (width 0 removes the row);
+     * @brief changes the width of the J-th extra row, preserving the stored values (with width 0, the row is removed);
      *        in the positional encoding, the lines are rebuilt with a new layout
      * @tparam J row index
      * @param width the new width (in bits); every value stored in the row must fit into it
@@ -672,10 +673,10 @@ public:
     void set_row_width(uint8_t width, uint64_t num_threads = 1) requires(mode == UNI);
 
     /**
-     * @brief adds extra rows to the input intervals and the header value to each line, and lets the records store
+     * @brief adds extra rows to the input intervals and the header value to each line; afterwards, the records store
      *        the lengths of the intervals (positional encoding without an inverse only; see
-     *        move_input_cache_lines::stores_lengths); the lines are rebuilt with a new layout, and the header
-     *        values are 0
+     *        move_input_cache_lines::stores_lengths). The lines are rebuilt with a new layout, and the header values
+     *        are 0.
      * @tparam row_fnc_t type of row_of
      * @param widths the widths (in bits) of the added rows
      * @param row_of row_of(x, J) returns the value of the J-th added row of the x-th input interval
@@ -706,8 +707,8 @@ public:
     /**
      * @brief loads the move data structure from an input stream
      * @param in input stream
-     * @param num_extra_rows the number of extra rows the data structure was built with; the positional encoding
-     *        reads it from the stream and ignores the argument
+     * @param num_extra_rows the number of extra rows the data structure was built with; in the positional encoding,
+     *        it is read from the stream and the argument is ignored
      */
     void load(std::istream& in, uint8_t num_extra_rows);
 

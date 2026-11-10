@@ -42,7 +42,7 @@
 static std::mt19937 gen(test_seed());
 static uint64_t max_num_threads = omp_get_max_threads();
 
-// maximum input size, calibrated by run_fuzz to its time budget
+// maximum input size, adjusted by run_fuzz to its time limit
 uint64_t max_input_size = 1800000;
 // smallest value run_fuzz reduces max_input_size to
 constexpr uint64_t min_fuzz_input_size = 30000;
@@ -97,7 +97,7 @@ constexpr uint64_t bi_serialization_query_stride_with_rows = 37;
 constexpr uint64_t hint_factor = 7919;
 constexpr uint64_t hint_offset = 13;
 // interval_near must find an input interval at most this many intervals away from the hint: it searches near_lines
-// lines before and after the line of the hint, and every line holds at least one interval
+// lines before and after the line of the hint, and every line contains at least one interval
 constexpr uint64_t interval_near_guaranteed_distance = move_input_cache_lines::near_lines;
 
 // a disjoint interval sequence: [0..k-1] the pairs (p_i, q_i), input interval i starts at p_i (increasing) and is
@@ -649,7 +649,7 @@ TEST(test_move_data_structure, move_data_structure)
         fuzz_iterations(num_fuzz_iterations), &max_input_size, min_fuzz_input_size);
 }
 
-// max_extra_rows extra rows of 64 bits leave room for only one input interval per line
+// with max_extra_rows extra rows of 64 bits, only one input interval fits into a line
 TEST(test_move_data_structure, add_rows_too_wide_throws_logic_error)
 {
     using mds_t = move_data_structure<CACHE_LINES, UNI>;

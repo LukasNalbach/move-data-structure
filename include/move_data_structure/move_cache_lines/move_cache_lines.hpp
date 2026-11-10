@@ -58,10 +58,10 @@
  * move_input_cache_lines.
  *
  * The slot of interval x is (x / records_per_line) << slot_record_bits | (x mod records_per_line), i.e., the
- * line index followed by the record index; the records reference intervals by their slots. The data lines
+ * line index followed by the record index; in the records, intervals are referenced by their slots. The data lines
  * store the intervals [0..k'], where interval k' is the sentinel interval starting at n (and the records after
  * it in the last data line store intervals of length 0 starting at n). They are followed by a sentinel line
- * with the line start n, in which every record references interval k'.
+ * with the line start n, in which every record refers to interval k'.
  */
 class move_cache_lines {
 public:
@@ -586,7 +586,7 @@ public:
 
     /**
      * @brief computes the layout of a line for the given widths: chooses the number of intervals per line,
-     *        the width of rel p and whether record 0 omits its rel p
+     *        the width of rel p and whether the rel p of record 0 is omitted
      * @param n size of the domain of the permutation
      * @param k_ k', the number of input intervals
      * @param omega_line_start bits per line start

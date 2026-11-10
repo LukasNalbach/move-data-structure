@@ -1,10 +1,11 @@
 # move-data-structure
 
 This repository contains a C++ implementation of the move data structure [1] with the balancing of [2]. It stores a
-disjoint interval sequence of [0, n) and answers move queries in constant time.
+disjoint interval sequence of [0, n); a move query is answered in O(1) time.
 
-- `move_data_structure<enc, mode>` is built in parallel from the pairs of the interval sequence. A move query maps a
-  position and the index of its input interval to its image and the index of the input interval containing it.
+- `move_data_structure<enc, mode>` is built in parallel from the pairs of the interval sequence. A move query returns,
+  for a position and the index of its input interval, the image of the position and the index of the input interval
+  containing the image.
 - `enc` is `CACHE_LINES` (default) or `ELIAS_FANO` (Elias-Fano coded starting positions, smaller).
 - `mode` is `UNI` (default) or `BI` (also move queries on the inverse function, only with `CACHE_LINES`).
 - Up to 5 extra rows with one value of a given bit width per input interval can be stored.
@@ -20,7 +21,7 @@ cmake -B build
 cmake --build build -j
 ```
 
-`cmake` downloads the submodule [string-utils](https://github.com/LukasNalbach/string-utils). The tests are written to
+`cmake` downloads the submodule [string-utils](https://github.com/LukasNalbach/string-utils). The tests are built in
 `build/tests/` if `MOVE_DATA_STRUCTURE_BUILD_TESTS` is switched on (`OFF` by default). The general
 options and environment variables (`MOVE_DATA_STRUCTURE_MARCH_NATIVE`, ...) are described in string-utils.
 
@@ -159,8 +160,8 @@ build/tests/test-move-data-structure
 ```
 
 The tests check random inputs for at most `MOVE_DATA_STRUCTURE_TEST_SECONDS` seconds (default 10) or
-`MOVE_DATA_STRUCTURE_TEST_ITERATIONS` inputs (default 1000) per function. A failed test prints its seed;
-`MOVE_DATA_STRUCTURE_TEST_SEED=<seed>` repeats its inputs.
+`MOVE_DATA_STRUCTURE_TEST_ITERATIONS` inputs (default 1000) per function. A failed test prints its seed; with
+`MOVE_DATA_STRUCTURE_TEST_SEED=<seed>`, the test is repeated with the same inputs.
 
 ## References
 
